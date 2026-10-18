@@ -1,9 +1,9 @@
-# そろう日さがし
+# 調整くんっ！
 
 身内向けの日程調整サイト。全員そろう日を、△の中身（調整可・並行調整中・ダメそう）まで見てさがす。
 
-- 公開ページ: https://b0544109-nk2.github.io/sorou-bi/
-- 見本データで動きを見る: https://b0544109-nk2.github.io/sorou-bi/?demo
+- 公開ページ: https://b0544109-nk2.github.io/chousei-kun/
+- 見本データで動きを見る: https://b0544109-nk2.github.io/chousei-kun/?demo
 
 ## しくみ
 

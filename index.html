@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <!--OGP-->
-<title>そろう日さがし</title>
+<title>調整くんっ！</title>
 <meta name="description" content="全員そろう日を、△の中身まで見てさがす日程調整">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="そろう日さがし">
-<meta property="og:title" content="そろう日さがし">
+<meta property="og:site_name" content="調整くんっ！">
+<meta property="og:title" content="調整くんっ！">
 <meta property="og:description" content="全員そろう日を、△の中身まで見てさがす日程調整">
-<meta property="og:image" content="https://b0544109-nk2.github.io/sorou-bi/ogp.png">
+<meta property="og:image" content="https://b0544109-nk2.github.io/chousei-kun/ogp.png">
 <meta name="twitter:card" content="summary_large_image">
 <!--/OGP-->
 <link rel="icon" type="image/png" href="favicon.png">
@@ -405,7 +405,7 @@
 <div class="wrap">
   <header>
     <span class="kicker">身内の日程調整</span>
-    <h1>そろう日さがし<span class="dot">！</span></h1>
+    <h1>調整くんっ<span class="dot">！</span></h1>
     <p class="lead">全員そろう日を、△の中身まで見てさがす</p>
     <span class="demo-note" id="demoNote" hidden>見本データで動いています（送信はされません）</span>
   </header>
@@ -1007,7 +1007,7 @@ function refreshPicked(){
 
 /* ---- 描画とイベント ---- */
 /* LINEなどに貼ったときに出るタイトル。本番では募集ごとのページのタイトルとプレビュー用の情報（OGP）にも同じ文を入れる */
-function pageTitle(ev){return "【〆"+md(ev.deadline)+"("+wd(ev.deadline)+")】"+ev.title+"｜そろう日さがし"}
+function pageTitle(ev){return "【〆"+md(ev.deadline)+"("+wd(ev.deadline)+")】"+ev.title+"｜調整くんっ！"}
 /* 読みこみ中・見つからない・まだつながっていない のとき */
 function renderState(){
   if(!READY)return '<section class="panel"><div class="sec-h" style="margin:0">まだシートにつながっていません</div>'+
@@ -1030,8 +1030,8 @@ function renderTop(){
 function render(){
   renderBar();
   var ev=cur(),body;
-  if(tab==="new"){document.title="新しい募集｜そろう日さがし";body=renderTop()}
-  else if(!READY||!ev){document.title="そろう日さがし";body=renderState()}
+  if(tab==="new"){document.title="新しい募集｜調整くんっ！";body=renderTop()}
+  else if(!READY||!ev){document.title="調整くんっ！";body=renderState()}
   else{document.title=pageTitle(ev);body=tab==="res"?renderRes():renderAns();if(tab==="res")checkPage(ev)}
   var v=document.getElementById("view");
   v.innerHTML='<div style="display:flex;flex-direction:column;gap:14px">'+body+'</div>';

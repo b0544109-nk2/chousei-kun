@@ -1,5 +1,5 @@
 /**
- * そろう日さがし｜セットアップ用 Apps Script
+ * 調整くんっ！｜セットアップ用 Apps Script
  *
  * 使い方（1回だけ）:
  *   1. https://script.google.com/ で「新しいプロジェクト」を作り、このファイルの中身を全部貼る
@@ -7,7 +7,7 @@
  *   3. 実行ログに出た「シートID」を Claude に伝える（config.js を作ってサイトにつなぎます）
  *
  * 作られるもの:
- *   - スプレッドシート「そろう日さがし（データ）」… タブ「募集」「回答」「設定」
+ *   - スプレッドシート「調整くんっ！（データ）」… タブ「募集」「回答」「設定」
  *   - フォーム2つ（募集用・回答用）… サイトが裏で送信する内部用。人が直接開くものではありません
  *   - スプレッドシートの共有を「リンクを知っている全員が閲覧可」に設定
  *
@@ -18,8 +18,8 @@
  */
 
 const SETUP = {
-  title: 'そろう日さがし',
-  pageUrl: 'https://b0544109-nk2.github.io/sorou-bi/',
+  title: '調整くんっ！',
+  pageUrl: 'https://b0544109-nk2.github.io/chousei-kun/',
 };
 
 // フォームの質問（回答シートの列は A:タイムスタンプ、B〜D がこの順）
@@ -87,7 +87,7 @@ function setup() {
 
 function buildForm_(title, questions, paragraphKey) {
   const f = FormApp.create(title);
-  f.setDescription('「そろう日さがし」のサイトから自動で送られる内部用のフォームです。直接回答しないでください。');
+  f.setDescription('「調整くんっ！」のサイトから自動で送られる内部用のフォームです。直接回答しないでください。');
   try { f.setCollectEmail(false); } catch (e) {}
   try { f.setLimitOneResponsePerUser(false); } catch (e) {}
   try { f.setShowLinkToRespondAgain(false); } catch (e) {}

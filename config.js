@@ -2,6 +2,6 @@
    sheetId が空のあいだは「まだシートにつながっていません」と表示されます（?demo で見本データ）。 */
 window.SOROU_CONFIG = {
   "sheetId": "",
-  "base": "https://b0544109-nk2.github.io/sorou-bi/",
+  "base": "https://b0544109-nk2.github.io/chousei-kun/",
   "forms": null
 };
