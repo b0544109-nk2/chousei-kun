@@ -1,0 +1,144 @@
+/**
+ * そろう日さがし｜セットアップ用 Apps Script
+ *
+ * 使い方（1回だけ）:
+ *   1. https://script.google.com/ で「新しいプロジェクト」を作り、このファイルの中身を全部貼る
+ *   2. 関数の選択で setup を選んで「実行」→ Googleの許可画面で許可する
+ *   3. 実行ログに出た「シートID」を Claude に伝える（config.js を作ってサイトにつなぎます）
+ *
+ * 作られるもの:
+ *   - スプレッドシート「そろう日さがし（データ）」… タブ「募集」「回答」「設定」
+ *   - フォーム2つ（募集用・回答用）… サイトが裏で送信する内部用。人が直接開くものではありません
+ *   - スプレッドシートの共有を「リンクを知っている全員が閲覧可」に設定
+ *
+ * 注意:
+ *   - タブの名前とフォームの質問の文言は変えないでください（サイトが名前で探しています）
+ *   - シートは誰でも読める設定です。名前と回答以外（メールアドレス・電話番号など）は書かないでください
+ *   - 2回実行すると、シートとフォームがもう1組できます（古いほうは消してOK）
+ */
+
+const SETUP = {
+  title: 'そろう日さがし',
+  pageUrl: 'https://b0544109-nk2.github.io/sorou-bi/',
+};
+
+// フォームの質問（回答シートの列は A:タイムスタンプ、B〜D がこの順）
+const EVENT_Q = { id: '募集ID', kind: '種類', body: '内容' };
+const ANSWER_Q = { id: '募集ID', key: '名前キー', body: '回答' };
+
+function setup() {
+  const ss = SpreadsheetApp.create(SETUP.title + '（データ）');
+  const ssId = ss.getId();
+
+  const fe = buildForm_(SETUP.title + '｜募集（内部用・直接開かない）', EVENT_Q, 'body');
+  const fa = buildForm_(SETUP.title + '｜回答（内部用・直接開かない）', ANSWER_Q, 'body');
+
+  fe.form.setDestination(FormApp.DestinationType.SPREADSHEET, ssId);
+  fa.form.setDestination(FormApp.DestinationType.SPREADSHEET, ssId);
+  SpreadsheetApp.flush();
+
+  const book = SpreadsheetApp.openById(ssId);
+  const evSheet = findResponseSheet_(ssId, fe.form).setName('募集');
+  const anSheet = findResponseSheet_(ssId, fa.form).setName('回答');
+
+  const config = {
+    sheetId: ssId,
+    base: SETUP.pageUrl,
+    forms: {
+      event: entries_(fe),
+      answer: entries_(fa),
+    },
+  };
+
+  const settings = book.getSheets().filter(s => !s.getFormUrl())[0] || book.insertSheet();
+  settings.setName('設定');
+  settings.getRange(1, 1, 6, 2).setValues([
+    ['項目', '値'],
+    ['シートID', ssId],
+    ['公開ページ', SETUP.pageUrl],
+    ['config', JSON.stringify(config)],
+    ['募集フォーム（編集用）', fe.form.getEditUrl()],
+    ['メモ', 'このスプシは「リンクを知っている全員が閲覧可」です。タブ名とフォームの質問は変えないでください。'],
+  ]);
+  settings.setColumnWidth(1, 160).setColumnWidth(2, 720).setFrozenRows(1);
+
+  [settings, evSheet, anSheet].forEach((s, i) => { book.setActiveSheet(s); book.moveActiveSheet(i + 1); });
+  // JSONの列が日付や数値に化けないよう、書式を「書式なしテキスト」にしておく
+  [evSheet, anSheet].forEach(s => s.getRange('B:D').setNumberFormat('@'));
+
+  let shared = true;
+  try {
+    DriveApp.getFileById(ssId).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {
+    shared = false;
+  }
+
+  Logger.log([
+    '✅ セットアップ完了',
+    'シートID: ' + ssId,
+    'スプレッドシート: ' + book.getUrl(),
+    shared ? '共有設定: リンクを知っている全員が閲覧可にしました'
+           : '⚠ 共有設定を変更できませんでした。スプシの「共有」→「リンクを知っている全員」→「閲覧者」にしてください',
+    '',
+    '↓ config.js の中身（Claude に「シートID」だけ伝えればOK）',
+    'window.SOROU_CONFIG = ' + JSON.stringify(config, null, 2) + ';',
+  ].join('\n'));
+}
+
+function buildForm_(title, questions, paragraphKey) {
+  const f = FormApp.create(title);
+  f.setDescription('「そろう日さがし」のサイトから自動で送られる内部用のフォームです。直接回答しないでください。');
+  try { f.setCollectEmail(false); } catch (e) {}
+  try { f.setLimitOneResponsePerUser(false); } catch (e) {}
+  try { f.setShowLinkToRespondAgain(false); } catch (e) {}
+  publish_(f);
+  // 選択肢の不一致で送信が弾かれないよう、すべて自由記述にする
+  const items = {};
+  Object.keys(questions).forEach(k => {
+    items[k] = k === paragraphKey ? f.addParagraphTextItem().setTitle(questions[k])
+                                  : f.addTextItem().setTitle(questions[k]);
+  });
+  return { form: f, items: items };
+}
+
+function publish_(f) {
+  try { if (typeof f.setPublished === 'function') f.setPublished(true); } catch (e) {}
+  f.setAcceptingResponses(true);
+}
+
+// 送信先URLと entry 番号（公開ページのHTMLにある本当の番号。item.getId() とは別物）
+function entries_(built) {
+  const publishedUrl = built.form.getPublishedUrl();
+  const idMap = extractAnswerIds_(publishedUrl);
+  const out = { action: publishedUrl.replace(/\/viewform.*$/, '/formResponse'), entries: {} };
+  Object.keys(built.items).forEach(k => {
+    const id = idMap[built.items[k].getId()];
+    if (!id) throw new Error('entry番号を特定できませんでした: ' + built.items[k].getTitle());
+    out.entries[k] = 'entry.' + id;
+  });
+  return out;
+}
+
+function extractAnswerIds_(publishedUrl) {
+  const html = UrlFetchApp.fetch(publishedUrl, { followRedirects: true, muteHttpExceptions: true }).getContentText();
+  const m = html.match(/FB_PUBLIC_LOAD_DATA_ = ([\s\S]*?);\s*<\/script>/);
+  if (!m) throw new Error('フォームの構造を読み取れませんでした（FB_PUBLIC_LOAD_DATA_ が見つかりません）');
+  const map = {};
+  JSON.parse(m[1])[1][1].forEach(it => { if (it[4] && it[4][0]) map[it[0]] = it[4][0][0]; });
+  return map;
+}
+
+function findResponseSheet_(ssId, form) {
+  const formId = form.getId();
+  for (let i = 0; i < 10; i++) {
+    const hit = SpreadsheetApp.openById(ssId).getSheets().find(s => {
+      const url = s.getFormUrl();
+      if (!url) return false;
+      if (url.indexOf(formId) >= 0) return true;
+      try { return FormApp.openByUrl(url).getId() === formId; } catch (e) { return false; }
+    });
+    if (hit) return hit;
+    Utilities.sleep(1500);
+  }
+  throw new Error('フォームの回答シートが見つかりませんでした：' + form.getTitle());
+}

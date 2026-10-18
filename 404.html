@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>そろう日さがし</title>
+<script>
+/* 募集ごとのページ e/<ID>/ がまだできていない数分のあいだも開けるよう、本体の ?e=<ID> へ転送する */
+(function(){
+  var p=location.pathname, m=p.match(/^(.*?\/)e\/([A-Za-z0-9_-]+)\/?/);
+  var root="/"+(p.split("/")[1]||"")+"/";
+  if(root==="//")root="/";
+  location.replace(m?m[1]+"?e="+m[2]+location.hash:root);
+})();
+</script>
+</head>
+<body style="font-family:sans-serif;padding:24px">
+<p>ページを開いています…　開かないときは <a href="/sorou-bi/">こちら</a></p>
+</body>
+</html>
