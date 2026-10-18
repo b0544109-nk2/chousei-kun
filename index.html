@@ -1030,7 +1030,8 @@ function renderTop(){
 function render(){
   renderBar();
   var ev=cur(),body;
-  if(tab==="new"){document.title="新しい募集｜調整くんっ！";body=renderTop()}
+  if(tab==="new"&&!READY){document.title="調整くんっ！";body=renderState()}
+  else if(tab==="new"){document.title="新しい募集｜調整くんっ！";body=renderTop()}
   else if(!READY||!ev){document.title="調整くんっ！";body=renderState()}
   else{document.title=pageTitle(ev);body=tab==="res"?renderRes():renderAns();if(tab==="res")checkPage(ev)}
   var v=document.getElementById("view");
