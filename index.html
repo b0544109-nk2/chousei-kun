@@ -389,6 +389,16 @@
   .prev{margin:0;font-size:.76rem;font-weight:700;color:var(--muted);background:rgba(255,255,255,.55);border-radius:12px;padding:6px 10px}
   .prev.ok{color:#1f7a52;background:rgba(126,226,176,.35)}
   td.cw{vertical-align:top}
+  .cell[data-tipn]{cursor:pointer}
+  .cell[data-tipn]:focus-visible{outline:3px solid var(--g1);outline-offset:2px}
+  .tip{position:fixed;z-index:30;max-width:min(17rem,calc(100vw - 16px));background:rgba(255,255,255,.97);border:1px solid rgba(139,123,255,.35);
+    border-radius:16px;padding:10px 12px;box-shadow:0 12px 28px -12px rgba(80,60,140,.55);font-size:.82rem;line-height:1.5;pointer-events:none}
+  .tip-h{display:flex;align-items:center;gap:8px;font-size:.84rem}
+  .tip-h span{color:var(--muted);font-size:.72rem;font-weight:700}
+  .tip-h .sym{font-size:.75rem}
+  .tip-b{margin-top:4px;font-weight:700}
+  .tip-b em{font-style:normal;color:#2f78b7;font-size:.76rem}
+  .tip-c{margin-top:6px;padding:6px 9px;border-radius:10px;background:#fff7ea;font-weight:700;overflow-wrap:anywhere}
   .untl{display:block;margin-top:2px;font-size:.6rem;font-weight:800;line-height:1.2;color:#2f78b7;white-space:nowrap}
   .untl.late{color:#d2335a}
   .untl.none{color:var(--muted);font-weight:700}
@@ -446,6 +456,7 @@
   </footer>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="tip" id="tip" role="tooltip" hidden></div>
 <div class="modal" id="doneModal" hidden role="dialog" aria-modal="true" aria-labelledby="doneTitle">
   <div class="modal-card">
     <div class="done-stamp" aria-hidden="true">全員<br>そろった！</div>
@@ -765,6 +776,29 @@ function untilTag(c,v){
   var late=c.until<today();
   return '<span class="untl'+(late?' late':'')+'" title="'+(late?'分かる予定の日を過ぎています':'この日までに分かる予定')+'">'+(late?'⏰':'〜')+md(c.until)+'</span>';
 }
+/* ---- 出欠表のセルの吹き出し ----
+   マウスはのせると出る・はなすと消える。スマホはタップで出て、ほかを押すと消える */
+var tipFor=null;
+function showTip(el){
+  var t=document.getElementById("tip");if(!t)return;
+  var d=el.dataset,v=d.tipv,m=SYM[v]||SYM["-"];
+  t.innerHTML='<div class="tip-h">'+symHtml(v)+'<b>'+esc(d.tipn)+'</b><span>'+esc(dl(d.tipd))+'</span></div>'+
+    '<div class="tip-b">'+esc(m.label)+(d.tipu?'<em>（'+esc(md(d.tipu))+'までに分かる）</em>':'')+'</div>'+
+    (d.tipc&&d.tipc!=="未回答"?'<div class="tip-c">'+esc(d.tipc)+'</div>':'');
+  t.hidden=false;tipFor=el;
+  var r=el.getBoundingClientRect(),tw=t.offsetWidth,th=t.offsetHeight,vw=document.documentElement.clientWidth;
+  var x=Math.min(Math.max(8,r.left+r.width/2-tw/2),vw-tw-8),y=r.top-th-8;
+  if(y<8)y=r.bottom+8;
+  t.style.left=x+"px";t.style.top=y+"px";
+}
+function hideTip(){var t=document.getElementById("tip");if(t)t.hidden=true;tipFor=null}
+document.addEventListener("pointerover",function(e){if(e.pointerType!=="mouse")return;var c=e.target.closest&&e.target.closest(".cell[data-tipn]");if(c&&c!==tipFor)showTip(c)});
+document.addEventListener("pointerout",function(e){if(e.pointerType!=="mouse"||!tipFor)return;var to=e.relatedTarget;if(!to||!tipFor.contains(to))hideTip()});
+document.addEventListener("click",function(e){var c=e.target.closest&&e.target.closest(".cell[data-tipn]");if(c){if(c===tipFor&&e.pointerType!=="mouse")hideTip();else showTip(c);return}if(tipFor)hideTip()});
+document.addEventListener("keydown",function(e){var c=e.target.closest&&e.target.closest(".cell[data-tipn]");if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();showTip(c)}else if(e.key==="Escape")hideTip()});
+window.addEventListener("scroll",hideTip,{passive:true});
+document.addEventListener("scroll",function(e){if(e.target&&e.target.classList&&e.target.classList.contains("boardwrap"))hideTip()},true);
+
 function names(arr){return arr.map(function(x){return esc(x.n)}).join("・")}
 
 /* ---- タブと試作用のきりかえ（本番は1ページ＝1募集） ---- */
@@ -863,7 +897,7 @@ function renderRes(){
         '<td class="ht"><span class="tmark t-'+r.tier+'">'+t.mark+'<small>'+t.name+'</small></span></td>'+
         mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=c?(c.conf?"kiken":c.v):"-",m=SYM[v];
           var tip=c?((c.conf?"別の予定が確定":"")+(c.c?(c.conf?"／":"")+c.c:"")):"未回答";
-          return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf))?' has-c':'')+'" title="'+esc(n+"："+m.label+(tip?"（"+tip+"）":""))+'">'+
+          return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf))?' has-c':'')+'" tabindex="0" role="button" data-tipn="'+esc(n)+'" data-tipv="'+v+'" data-tipc="'+esc(tip)+'" data-tipu="'+esc(v==="machi"&&c&&c.until?c.until:"")+'" data-tipd="'+esc(r.d)+'">'+
             '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':'')+'</span>'+untilTag(c,v)+'</td>'}).join("")+'</tr>'}).join("")+
     '</tbody></table></div><p class="note">右上の点はひとことあり、⚠ は別の予定がその日に確定した人です。✕ の行は来られない人がいる日です。</p>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
