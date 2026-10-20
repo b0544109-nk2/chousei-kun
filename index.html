@@ -388,6 +388,17 @@
   .slot{border-bottom:1px solid var(--line)}
   .prev{margin:0;font-size:.76rem;font-weight:700;color:var(--muted);background:rgba(255,255,255,.55);border-radius:12px;padding:6px 10px}
   .prev.ok{color:#1f7a52;background:rgba(126,226,176,.35)}
+  .xwrap{display:flex;flex-direction:column;gap:12px}
+  .xbox summary small{margin-left:8px;font-size:.7rem;color:var(--muted)}
+  .xlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .xlist li{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.65)}
+  .xlist li.cur{outline:2px solid rgba(139,123,255,.5)}
+  .xlist a{font-weight:800;color:var(--ink);text-decoration:none;flex:1 1 10rem;min-width:0;overflow-wrap:anywhere}
+  .xlist a:hover{text-decoration:underline}
+  .xs{font-size:.7rem;font-weight:700;border-radius:999px;padding:2px 8px;background:rgba(255,255,255,.85);color:var(--muted);white-space:nowrap}
+  .xs.done{background:rgba(126,226,176,.45);color:#1f6a46}
+  .xs.late{background:#ffe0e6;color:#c0304f}
+  .xs.other{background:rgba(143,208,255,.3);color:#2f78b7}
   td.cw{vertical-align:top}
   .cell[data-tipn]{cursor:pointer}
   .cell[data-tipn]:focus-visible{outline:3px solid var(--g1);outline-offset:2px}
@@ -443,6 +454,7 @@
   </div>
 
   <main id="view"></main>
+  <section id="extra" class="xwrap" hidden></section>
 
   <footer>
     <div>○ 行ける ／ △可 避けたいけど調整できる ／ △待 並行調整中 ／ △危 ダメになりそう ／ × 無理</div>
@@ -720,6 +732,66 @@ function refresh(){
     if(ev)return loadForeign(membersOf(ev).concat(store(MYNAME)?[store(MYNAME)]:[])).then(function(ch){if(ch)render()});
   }).then(schedule,schedule);
 }
+/* ================= ページの下：ほかの募集へのリンク =================
+   ・回答した人：この端末で答えた募集を端末の中にだけ記録し、同じ名前で開いたときだけ並べる（ほかの人には見えない）
+   ・幹事（フリカレの鍵を入れた端末）：シートにある募集をぜんぶ並べる */
+var JOINED="sorouhi.joined", joinedInfo={}, allEvents=null, extraAt=0;
+function isBoss(){return !DEMO&&!!store(BUSYKEY)}
+function recordJoined(ev,name){
+  var list=(jget(JOINED)||[]).filter(function(j){return !(j.id===ev.id&&norm(j.name)===norm(name))});
+  list.push({id:ev.id,title:ev.title,deadline:ev.deadline,name:name,at:Date.now()});
+  jset(JOINED,list.slice(-80));
+}
+function myNameNow(){return String((tab==="ans"&&draft&&draft.name)||store(MYNAME)||"").trim()}
+function joinedFor(name){
+  var k=norm(name);if(!k)return [];
+  return (jget(JOINED)||[]).filter(function(j){return norm(j.name)===k&&j.id!==EID}).reverse();
+}
+function loadExtra(){
+  if(DEMO||!READY)return;
+  if(isBoss()){
+    if(Date.now()-extraAt<20000&&allEvents){renderExtra();return}
+    extraAt=Date.now();
+    Promise.all([gviz("募集"),gviz("回答","select B, C")]).then(function(r){
+      var evs=parseEvents(r[0]),cnt={};
+      r[1].forEach(function(row){var id=safeId(row[0]);(cnt[id]=cnt[id]||{})[row[1]]=1});
+      allEvents=Object.keys(evs).map(function(id){var e=evs[id];e.answers=Object.keys(cnt[id]||{}).length;return e});
+      renderExtra();
+    }).catch(function(){});
+    return;
+  }
+  var js=joinedFor(myNameNow()),ids=js.map(function(j){return safeId(j.id)}).filter(function(id){return id&&!joinedInfo[id]});
+  if(!ids.length){renderExtra();return}
+  gviz("募集","select * where B matches '"+ids.slice(0,40).join("|")+"'").then(function(rows){
+    var evs=parseEvents(rows);Object.keys(evs).forEach(function(id){joinedInfo[id]=evs[id]});renderExtra();
+  }).catch(function(){renderExtra()});
+}
+function evStatus(e){
+  if(e.decided)return '<span class="xs done">決定 '+esc(dl(e.decided))+'</span>';
+  var late=e.deadline&&e.deadline<today();
+  return '<span class="xs'+(late?' late':'')+'">〆'+(e.deadline?md(e.deadline)+'('+wd(e.deadline)+')':'未定')+(late?' 過ぎ':'')+'</span>';
+}
+function renderExtra(){
+  var box=document.getElementById("extra");if(!box)return;
+  var h="";
+  if(isBoss()&&allEvents){
+    var mine={};(jget(MINE)||[]).forEach(function(m){mine[m.id]=1});
+    var list=allEvents.slice().sort(function(a,b){
+      if(!!a.decided!==!!b.decided)return a.decided?1:-1;
+      return a.decided?(a.decided<b.decided?1:-1):((a.deadline||"9")<(b.deadline||"9")?-1:1)});
+    var open=list.filter(function(e){return !e.decided}).length;
+    h+='<details class="fold xbox"'+(tab==="new"?' open':'')+'><summary>📋 すべての募集（調整中 '+open+'・決定 '+(list.length-open)+'）<small>幹事の端末だけに表示</small></summary><ul class="xlist">'+
+      list.map(function(e){return '<li'+(e.id===EID?' class="cur"':'')+'><a href="'+esc(BASE+"?e="+e.id)+'">'+esc(e.title)+'</a>'+evStatus(e)+
+        '<span class="xs">回答 '+e.answers+(e.count?'/'+e.count:'')+'人</span>'+(mine[e.id]?'':'<span class="xs other">ほかの端末で作成</span>')+'</li>'}).join("")+'</ul></details>';
+  }else if(!isBoss()){
+    var nm=myNameNow(),js=joinedFor(nm);
+    if(js.length)h+='<section class="panel xbox"><div class="sec-h" style="margin:0">'+esc(nm)+'さんが答えたほかの募集</div><ul class="xlist">'+
+      js.map(function(j){var e=joinedInfo[j.id]||{title:j.title,deadline:j.deadline,decided:null};
+        return '<li><a href="'+esc(BASE+"e/"+j.id+"/")+'">'+esc(e.title)+'</a>'+evStatus(e)+'</li>'}).join("")+
+      '</ul><p class="note">この端末で答えた募集だけが出ます。ほかの人には見えません。</p></section>';
+  }
+  box.innerHTML=h;box.hidden=!h;
+}
 function schedule(){clearTimeout(pollT);pollT=setTimeout(function(){if(document.hidden){schedule();return}refresh()},30000+Math.random()*8000)}
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&Date.now()-lastLoad>10000)refresh()});
 window.addEventListener("online",function(){if(EID){flushEvent(EID);flushAnswers(EID)}refresh()});
@@ -971,6 +1043,7 @@ function setName(name){
   draft=newDraft(ev,name);
   if(!draft.loaded&&prev){draft.rows=prev.rows;draft.target=prev.target}
   store(MYNAME,name);
+  setTimeout(loadExtra,0);
   offerRef(ev);render();
   /* 別の募集の回答はまだ読んでいなければ読んでから、参照するか聞く */
   var d0=draft;
@@ -1140,6 +1213,7 @@ function render(){
   var v=document.getElementById("view");
   v.innerHTML='<div style="display:flex;flex-direction:column;gap:14px">'+body+'</div>';
   if(tab==="new")refreshPicked();
+  renderExtra();
 }
 var toastT;
 function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},2600)}
@@ -1201,7 +1275,7 @@ document.addEventListener("click",function(e){
     var a={};Object.keys(draft.rows).forEach(function(d){var r=draft.rows[d];a[d]={v:r.v};if(r.c)a[d].c=r.c;if(r.v==="machi"&&r.until)a[d].until=r.until});
     var before=Object.keys(latest(ev.id)).length;
     if(DEMO)S.answers.push({ev:ev.id,name:draft.name,ts:Date.now(),a:a});
-    else{sendAnswer(ev,draft.name,a);S.answers.push({ev:ev.id,name:draft.name,ts:1e12+Date.now(),a:a,n:"(local)"})}
+    else{sendAnswer(ev,draft.name,a);recordJoined(ev,draft.name);S.answers.push({ev:ev.id,name:draft.name,ts:1e12+Date.now(),a:a,n:"(local)"})}
     var after=Object.keys(latest(ev.id)).length,last=ev.count&&before<ev.count&&after>=ev.count;
     toast(draft.name+"さんの回答を送りました");draft=null;tab="res";render();window.scrollTo({top:0});
     if(last)showDone(ev);
@@ -1267,6 +1341,7 @@ document.addEventListener("pointercancel",function(){nd.drag=null});
 render();
 if(EID&&READY&&!DEMO)refresh();
 if(tab==="new")loadBusy();
+loadExtra();setInterval(function(){if(!document.hidden)loadExtra()},120000);
 })();
 </script>
 </body>
