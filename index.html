@@ -749,7 +749,7 @@ function cellOf(ev,L,name,d){
   var a=L[norm(name)];if(!a)return null;
   var c=a.a[d]||{v:"-"};
   var r={v:c.v||"-",c:c.c||"",until:c.until||"",conf:null,eff:c.v||"-"};
-  if(r.v!=="x"&&r.v!=="-"){var o=conflictOf(ev,name,d);if(o){r.conf=o;r.eff="kiken"}}
+  if(r.v!=="x"&&r.v!=="-"){var o=conflictOf(ev,name,d);if(o){r.conf=o;r.eff="x"}}   /* 別の募集がこの日に決まった → 自動で ×（元の回答は残すので、決定を取り消せば戻る） */
   return r;
 }
 function analyze(ev,skip){
@@ -895,11 +895,11 @@ function renderRes(){
     list.map(function(r){var t=tierObj(r);
       return '<tr class="r-'+r.tier+(r.d===selDate?' sel':'')+(ev.decided===r.d?' dec':'')+'" data-row="'+r.d+'"><th class="hd"><button data-row="'+r.d+'">'+dlHtml(r.d)+'</button></th>'+
         '<td class="ht"><span class="tmark t-'+r.tier+'">'+t.mark+'<small>'+t.name+'</small></span></td>'+
-        mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=c?(c.conf?"kiken":c.v):"-",m=SYM[v];
-          var tip=c?((c.conf?"別の予定が確定":"")+(c.c?(c.conf?"／":"")+c.c:"")):"未回答";
+        mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=c?(c.conf?"x":c.v):"-",m=SYM[v];
+          var tip=c?((c.conf?"別の予定がこの日に決まったので自動で ×（元の回答は "+SYM[c.v].g+SYM[c.v].sub+"）":"")+(c.c?(c.conf?"／":"")+c.c:"")):"未回答";
           return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf))?' has-c':'')+'" tabindex="0" role="button" data-tipn="'+esc(n)+'" data-tipv="'+v+'" data-tipc="'+esc(tip)+'" data-tipu="'+esc(v==="machi"&&c&&c.until?c.until:"")+'" data-tipd="'+esc(r.d)+'">'+
             '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':'')+'</span>'+untilTag(c,v)+'</td>'}).join("")+'</tr>'}).join("")+
-    '</tbody></table></div><p class="note">右上の点はひとことあり、⚠ は別の予定がその日に確定した人です。✕ の行は来られない人がいる日です。</p>';
+    '</tbody></table></div><p class="note">右上の点はひとことあり、⚠× は別の募集がその日に決まったので自動で × にした人です。✕ の行は来られない人がいる日です。</p>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
   h+='<section class="panel"><div class="legend">'+["o","ka","machi","kiken","x"].map(function(v){return '<div>'+symHtml(v)+SYM[v].label+'</div>'}).join("")+'</div></section>';
@@ -918,9 +918,9 @@ function card(ev,r){
   var h='<article class="dcard t-'+r.tier+'"><div class="dhead">'+dlHtml(r.d)+'<span class="tier">'+t.mark+' '+t.name+'</span></div>'+
     '<p class="tdesc">'+desc+'</p>';
   if(list.length)h+='<ul class="who">'+list.map(function(x){var c=x.c;
-    var note=c.conf?"別の予定がこの日に確定"+(c.c?"／"+c.c:""):c.c;
+    var note=c.conf?"別の予定がこの日に決まったので自動で ×（元の回答は "+SYM[c.v].g+SYM[c.v].sub+"）"+(c.c?"／"+c.c:""):c.c;
     if(c.v==="machi"&&c.until&&!c.conf)note=(note?note+"・":"")+md(c.until)+"に分かる";
-    return '<li>'+symHtml(c.conf?"kiken":c.v)+'<span class="nm">'+esc(x.n)+'</span>'+(c.conf?'<span class="chip warn">⚠ 別の予定</span>':'')+(note?'<em>'+esc(note)+'</em>':'')+'</li>'}).join("")+'</ul>';
+    return '<li>'+symHtml(c.conf?"x":c.v)+'<span class="nm">'+esc(x.n)+'</span>'+(c.conf?'<span class="chip warn">⚠ 別の予定</span>':'')+(note?'<em>'+esc(note)+'</em>':'')+'</li>'}).join("")+'</ul>';
   var foot=[];
   if(g.o.length)foot.push('○ <b>'+g.o.length+'人</b>：'+names(g.o));
   if(g.none.length)foot.push('回答まだ：'+names(g.none));
@@ -1016,7 +1016,7 @@ function renderAns(){
     '<p class="note">各候補の下に、ほかの人の回答と、いまの状態が出ています。</p>'+
     ev.dates.slice().sort().map(function(d){var r=draft.rows[d],tr=tierBy[d],t=tierObj(tr);
       var others=mem.filter(function(n){return norm(n)!==norm(draft.name)}).map(function(n){
-        var c=cellOf(ev,L,n,d),v=c?(c.conf?"kiken":c.v):"-",m=SYM[v],note=c?(c.conf?"別の予定が確定":c.c):"未回答";
+        var c=cellOf(ev,L,n,d),v=c?(c.conf?"x":c.v):"-",m=SYM[v],note=c?(c.conf?"別の予定が確定":c.c):"未回答";
         return '<span class="mini s-'+(v==="-"?"none":v)+'" title="'+esc(n+"："+m.label+(note?"（"+note+"）":""))+'"><b>'+m.g+(m.sub?'<i>'+m.sub+'</i>':'')+'</b>'+esc(n)+(v==="machi"&&c&&c.until?'<small class="mu'+(c.until<today()?' late':'')+'">'+md(c.until)+'まで</small>':'')+(c&&(c.c||c.conf)?'<u>●</u>':'')+'</span>'}).join("");
       var x='<div class="arow'+(r.ref?' ref':'')+'"><div class="arow-top">'+dlHtml(d)+'<div class="symrow">'+ORDER.map(function(v){return symBtn(v,"set",d,r.v===v)}).join("")+'</div>'+
         '<button class="cbtn'+(r.c?' has':'')+'" data-cm="'+d+'" aria-label="'+dl(d)+'のひとこと">💬</button></div>'+
