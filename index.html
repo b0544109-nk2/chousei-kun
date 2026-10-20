@@ -425,6 +425,11 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .done-text{margin:0;width:100%;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:.8rem;line-height:1.55;
+    background:#f6f2fd;border:1px dashed rgba(139,123,255,.45);border-radius:14px;padding:10px 12px;max-height:9.5rem;overflow:auto}
+  .btn.done-copy{width:100%;font-size:1rem;padding:13px}
+  .btn.xdm{background:#0f1419;color:#fff;border:none}
+  .linkbtn{border:none;background:none;color:var(--muted);font-size:.8rem;text-decoration:underline;padding:4px}
   .decide{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-top:10px;border-top:1px dashed rgba(109,101,133,.3)}
   .decide-h{font-size:.78rem;font-weight:800;color:var(--muted)}
   .dbtn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
@@ -479,14 +484,16 @@
 <div class="tip" id="tip" role="tooltip" hidden></div>
 <div class="modal" id="doneModal" hidden role="dialog" aria-modal="true" aria-labelledby="doneTitle">
   <div class="modal-card">
-    <div class="done-stamp" aria-hidden="true">全員<br>そろった！</div>
-    <h3 id="doneTitle">全員の回答がそろいました！</h3>
-    <p id="doneBody">幹事さんやみんなに連絡しましょう。</p>
+    <div class="done-stamp" aria-hidden="true">最後の<br>ひとり！</div>
+    <h3 id="doneTitle">あなたで全員そろいました！</h3>
+    <p id="doneBody">幹事さんはまだ気づいていません📣<br>みんなのグループに、この文をそのまま貼って知らせてください！</p>
+    <pre class="done-text" id="doneText"></pre>
+    <button class="btn go done-copy" id="doneCopy">📋 知らせる文をコピー</button>
     <div class="row" style="justify-content:center">
-      <a class="btn line" id="doneLine" href="#" target="_blank" rel="noopener">LINEで知らせる</a>
-      <button class="btn" id="doneCopy">知らせる文をコピー</button>
+      <a class="btn line sm" id="doneLine" href="#" target="_blank" rel="noopener">LINEで送る</a>
+      <a class="btn sm xdm" id="doneX" href="#" target="_blank" rel="noopener">XのDMで送る</a>
     </div>
-    <button class="btn sub sm" id="doneClose">とじる</button>
+    <button class="linkbtn" id="doneClose">あとで</button>
   </div>
 </div>
 
@@ -941,11 +948,16 @@ function shareBox(ev){
 /* 最後の1人が回答したときのお知らせ */
 function doneText(ev){
   var best=analyze(ev)[0],t=tierObj(best);
-  return "【"+ev.title+"】全員の回答がそろいました！\nいちばん近いのは "+dl(best.d)+"（"+t.name+"）\n結果はこちら → "+resultUrl(ev);
+  return "【"+ev.title+"】全員の回答がそろいました！🎉\nいちばん近いのは "+dl(best.d)+"（"+t.name+"）\n幹事さん、日程を決めてください🙏"+(doneWho?"（最後に答えた "+doneWho+" より）":"")+"\n結果はこちら → "+resultUrl(ev);
 }
-function showDone(ev){
-  document.getElementById("doneBody").textContent=ev.count+"人ぶんの回答がそろいました。幹事さんやみんなに連絡しましょう！";
-  document.getElementById("doneLine").href="https://line.me/R/share?text="+encodeURIComponent(doneText(ev));
+var doneWho="";
+function showDone(ev,who){
+  doneWho=who||"";
+  var txt=doneText(ev);
+  document.getElementById("doneText").textContent=txt;
+  document.getElementById("doneCopy").textContent="📋 知らせる文をコピー";
+  document.getElementById("doneLine").href="https://line.me/R/share?text="+encodeURIComponent(txt);
+  document.getElementById("doneX").href="https://x.com/messages/compose?text="+encodeURIComponent(txt);
   document.getElementById("doneModal").hidden=false;
 }
 function copyText(txt,okMsg){
@@ -1285,7 +1297,7 @@ document.addEventListener("click",function(e){
   if(b.id==="tabAns"){tab="ans";if(!draft||draft.ev!==ev.id){var my=store(MYNAME);draft=null;if(my&&membersOf(ev).some(function(n){return norm(n)===norm(my)})){setName(my);return}}render();return}
   if(ds.ev){if(ds.ev==="__new"){tab="new"}else{S.cur=ds.ev;save();if(tab==="new")tab="res";draft=null}confirmDate=null;render();window.scrollTo({top:0});return}
   if(b.id==="doneClose"){document.getElementById("doneModal").hidden=true;return}
-  if(b.id==="doneCopy"){copyText(doneText(ev),"知らせる文をコピーしました");return}
+  if(b.id==="doneCopy"){copyText(doneText(ev),"知らせる文をコピーしました");if(!document.getElementById("doneModal").hidden)b.textContent="✓ コピーしました！グループに貼ってね";return}
   if(b.id==="copyUrl"){copyText(shareUrl(ev),"URLをコピーしました");return}
   if(b.id==="copyMsg"){copyText(shareText(ev),"案内文をコピーしました");return}
   if(b.id==="resetDemo"){S=seed();draft=null;unstar={};tab="res";render();toast("見本データに戻しました");return}
@@ -1337,8 +1349,9 @@ document.addEventListener("click",function(e){
     if(DEMO)S.answers.push({ev:ev.id,name:draft.name,ts:Date.now(),a:a});
     else{sendAnswer(ev,draft.name,a);recordJoined(ev,draft.name);S.answers.push({ev:ev.id,name:draft.name,ts:1e12+Date.now(),a:a,n:"(local)"})}
     var after=Object.keys(latest(ev.id)).length,last=ev.count&&before<ev.count&&after>=ev.count;
+    var sentName=draft.name;
     toast(draft.name+"さんの回答を送りました");draft=null;tab="res";render();window.scrollTo({top:0});
-    if(last)showDone(ev);
+    if(last)showDone(ev,sentName);
     return;
   }
 });
