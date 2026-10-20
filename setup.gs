@@ -62,20 +62,45 @@ function setup() {
   ]);
   settings.setColumnWidth(1, 160).setColumnWidth(2, 720).setFrozenRows(1);
 
-  [settings, evSheet, anSheet].forEach((s, i) => { book.setActiveSheet(s); book.moveActiveSheet(i + 1); });
-  // JSONの列が日付や数値に化けないよう、書式を「書式なしテキスト」にしておく
-  [evSheet, anSheet].forEach(s => s.getRange('B:D').setNumberFormat('@'));
+  // タブの並べ替えは見た目だけなので、失敗しても先に進む
+  try { [settings, evSheet, anSheet].forEach((s, i) => { book.setActiveSheet(s); book.moveActiveSheet(i + 1); }); } catch (e) {}
+  // ※回答タブ（フォームとつながったタブ）の列の書式は変えない。複数列をまとめて変えると
+  //   「列単位の操作を行うには…」のエラーで止まる。中身はJSONなので書式を変えなくても化けない
 
+  shareAndLog_(book, config);
+}
+
+/**
+ * setup が途中で止まったとき用（「列単位の操作を行うには…」のエラーなど）。
+ * いちばん新しい「調整くんっ！（データ）」を探して、共有設定とログ出力だけをやり直す。
+ * シートとフォームは作り直さないので、二重にできない。
+ */
+function finish() {
+  const files = DriveApp.getFilesByName(SETUP.title + '（データ）');
+  let newest = null;
+  while (files.hasNext()) {
+    const f = files.next();
+    if (f.isTrashed()) continue;
+    if (!newest || f.getDateCreated() > newest.getDateCreated()) newest = f;
+  }
+  if (!newest) throw new Error('「' + SETUP.title + '（データ）」が見つかりません。setup をもう一度実行してください。');
+  const book = SpreadsheetApp.openById(newest.getId());
+  const settings = book.getSheetByName('設定');
+  const row = settings && settings.getDataRange().getValues().find(r => r[0] === 'config');
+  if (!row) throw new Error('設定タブに config がありません。このスプレッドシートとフォーム2つをゴミ箱に入れて、setup をもう一度実行してください。');
+  shareAndLog_(book, JSON.parse(row[1]));
+}
+
+function shareAndLog_(book, config) {
   let shared = true;
   try {
-    DriveApp.getFileById(ssId).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    DriveApp.getFileById(book.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (e) {
     shared = false;
   }
-
   Logger.log([
     '✅ セットアップ完了',
-    'シートID: ' + ssId,
+    'シートID: ' + book.getId(),
     'スプレッドシート: ' + book.getUrl(),
     shared ? '共有設定: リンクを知っている全員が閲覧可にしました'
            : '⚠ 共有設定を変更できませんでした。スプシの「共有」→「リンクを知っている全員」→「閲覧者」にしてください',
