@@ -386,6 +386,7 @@
   .slot{border-bottom:1px solid var(--line)}
   .prev{margin:0;font-size:.76rem;font-weight:700;color:var(--muted);background:rgba(255,255,255,.55);border-radius:12px;padding:6px 10px}
   .prev.ok{color:#1f7a52;background:rgba(126,226,176,.35)}
+  .share .btn[disabled]{opacity:.6;cursor:default;background:rgba(255,255,255,.6)}
   .share details.fold{box-shadow:none;background:rgba(255,255,255,.45)}
   .share details.fold input{margin-top:6px;font-size:.8rem}
   .note a{color:#6a55f0;font-weight:700}
@@ -776,8 +777,8 @@ var pageReady={};
 function checkPage(ev){
   if(DEMO||pageReady[ev.id])return;
   fetch(shareUrl(ev),{method:"HEAD",cache:"no-store"}).then(function(r){
-    if(r.ok){pageReady[ev.id]=true;var el=document.getElementById("prevState");if(el){el.className="prev ok";el.textContent="✓ LINEなどのプレビューの準備ができました"}}
-    else setTimeout(function(){checkPage(ev)},30000);
+    if(r.ok){pageReady[ev.id]=true;if(tab==="res"&&cur()&&cur().id===ev.id)render()}   /* コピーのボタンを押せるように描き直す */
+    else setTimeout(function(){checkPage(ev)},10000);
   }).catch(function(){setTimeout(function(){checkPage(ev)},60000)});
 }
 function shareText(ev){return "【"+ev.title+"】日程調整です！\n"+md(ev.deadline)+"("+wd(ev.deadline)+")までに回答お願いします🙏\n"+shareUrl(ev)}
@@ -794,11 +795,15 @@ function shareBox(ev){
   var u=shareUrl(ev);
   return '<section class="share"><div class="share-h">📮 回答用のURLを配る</div>'+
     '<input type="text" id="shareUrl" readonly value="'+esc(u)+'" aria-label="回答用のURL">'+
-    '<div class="row"><button class="btn" id="copyUrl">URLをコピー</button><button class="btn sub sm" id="copyMsg">案内文ごとコピー</button>'+
-    '<a class="btn line" href="https://line.me/R/share?text='+encodeURIComponent(shareText(ev))+'" target="_blank" rel="noopener">LINEで送る</a></div>'+
+    /* プレビュー用ページができる前に貼ると、LINE や X が「中身なし」を覚えてしまい、しばらく直らない。
+       だから準備ができるまではコピーを押せないようにする（急ぐとき用に「待たずにコピー」は残す） */
+    (DEMO||pageReady[ev.id]?
+      '<div class="row"><button class="btn" id="copyUrl">URLをコピー</button><button class="btn sub sm" id="copyMsg">案内文ごとコピー</button>'+
+      '<a class="btn line" href="https://line.me/R/share?text='+encodeURIComponent(shareText(ev))+'" target="_blank" rel="noopener">LINEで送る</a></div>':
+      '<div class="row"><button class="btn" disabled aria-disabled="true">⏳ プレビューの準備中…</button><button class="btn sub sm" id="copyUrl">待たずにコピー</button></div>')+
     (DEMO?'<p class="note">見本データなので、このURLは開けません。</p>':
-      '<p class="'+(pageReady[ev.id]?'prev ok':'prev')+'" id="prevState">'+(pageReady[ev.id]?'✓ LINEなどのプレビューの準備ができました':
-        '⏳ URLはもう開けます。LINEなどに貼ったときのプレビュー（〆切つきタイトル）は準備中です。作ってから1〜2分ほどで準備されます（この表示が「✓」に変わったら送りどき）')+'</p>')+
+      '<p class="'+(pageReady[ev.id]?'prev ok':'prev')+'" id="prevState">'+(pageReady[ev.id]?'✓ プレビューの準備ができました。LINEやXに貼ると〆切つきのタイトルが出ます':
+        '1分ほどで、LINEやXに貼ったときのプレビュー（〆切つきタイトル）ができます。できる前に貼ると、しばらくプレビューが出なくなるので少し待ってください')+'</p>')+
     (isOwner(ev.id)&&!DEMO?'<details class="fold"><summary>幹事用のURL（自分だけで使う）</summary><p class="note">別のスマホやPCで「この日に決める」を押したいときは、このURLで開きます。みんなには配らないでください。</p>'+
       '<input type="text" readonly value="'+esc(BASE+"?e="+ev.id+"&kanji")+'" aria-label="幹事用のURL"></details>':'')+
     '</section>';
