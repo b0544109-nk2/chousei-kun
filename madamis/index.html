@@ -130,6 +130,9 @@
   tr.hasng td{opacity:.6}
   tr.hasng td.t{opacity:1}
   tr.hasng td.t button{text-decoration:line-through;text-decoration-color:rgba(109,101,133,.5)}
+  .rk{display:inline-flex;align-items:center;justify-content:center;min-width:1.4rem;height:1.4rem;border-radius:999px;background:var(--grad);color:#fff;font-size:.68rem;margin-right:6px;padding:0 4px}
+  details.outfold summary{cursor:pointer;font-weight:800;color:var(--muted);font-size:.86rem}
+  details.outfold .tblwrap{margin-top:8px;box-shadow:none}
   .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:.74rem;font-weight:700;color:var(--muted);align-items:center}
   .legend .dot{width:1.4rem;height:1.4rem;font-size:.6rem}
 
@@ -172,7 +175,7 @@ var CHAINS=[["JOL","ジョルディーノ"],["QW","クインズワルツ"],["ZAN
 /* ================= 状態 ================= */
 var S={rows:[],loaded:DEMO,err:""};
 var tab="in", mine=null, saveState="", f=loadView();
-function loadView(){var d={ch:{},sort:"time",rs:"score",rg:"all"};try{var j=JSON.parse(store(VIEW)||"{}");for(var k in d)if(k in j)d[k]=j[k]}catch(e){}return d}
+function loadView(){var d={ch:{},sort:"time",rs:"score"};try{var j=JSON.parse(store(VIEW)||"{}");for(var k in d)if(k in j)d[k]=j[k]}catch(e){}return d}
 function saveView(){store(VIEW,JSON.stringify(f))}
 
 /* ================= シート ================= */
@@ -329,32 +332,38 @@ function inputView(){
   return h;
 }
 function resultView(){
+  /* パスが1人でもいる作品は候補にしない（下に「候補から外れた作品」として畳んでおく） */
   var ps=people(), all=sortWorks(shown(WORKS));
   var rows=all.map(function(w){
     var c={w:0,i:0,n:0,e:0};ps.forEach(function(p){var v=p.mm[w.id];c[v||"e"]++});
     return {w:w,c:c,score:c.w*2+c.i};
   });
-  if(f.rg==="ok")rows=rows.filter(function(r){return !r.c.n});
-  rows.sort(function(a,b){
+  var ok=rows.filter(function(r){return !r.c.n}), out=rows.filter(function(r){return r.c.n});
+  ok.sort(function(a,b){
     if(f.rs==="time")return (a.w.mn-b.w.mn)||(b.score-a.score);
-    return ((a.c.n>0)-(b.c.n>0))||(b.score-a.score)||(b.c.w-a.c.w)||(a.w.mn-b.w.mn);
+    return (b.score-a.score)||(b.c.w-a.c.w)||(a.c.e-b.c.e)||(a.w.mn-b.w.mn);
   });
-  var okAll=rows.filter(function(r){return !r.c.n&&r.c.w+r.c.i===ps.length&&ps.length});
+  out.sort(function(a,b){return (a.c.n-b.c.n)||(b.score-a.score)});
+  var full=ok.filter(function(r){return ps.length&&!r.c.e});
   var h='<section class="panel"><div class="sumtop">'+
     '<div class="stat"><b>'+ps.length+'人</b><span>入力した人</span></div>'+
-    '<div class="stat"><b>'+rows.filter(function(r){return !r.c.n&&r.c.w}).length+'作</b><span>パスなし＆誰かがやりたい</span></div>'+
-    '<div class="stat"><b>'+okAll.length+'作</b><span>全員が やりたい/興味あり</span></div></div>'+
+    '<div class="stat"><b>'+ok.length+'作</b><span>候補（パスが1人もいない）</span></div>'+
+    '<div class="stat"><b>'+full.length+'作</b><span>そのうち全員が入力ずみ</span></div></div>'+
     (ps.length?'<p class="note">入力した人：'+ps.map(function(p){var n=Object.keys(p.mm).filter(function(k){return wById(k)}).length;return esc(p.name)+'（'+n+'作）'}).join("、")+'</p>':'<p class="note">まだ誰も入力していません。</p>')+
+    '<p class="note">「プレイ済みor別のがいい」が1人でもいる作品は候補から外して、いちばん下にまとめています。</p>'+
     filterBar(false)+
-    '<div class="row"><span class="lbl">並び</span>'+[["score","人気順（パスありは下）"],["time","時間が短い順"]].map(function(o){return '<button class="chipbtn" data-rs="'+o[0]+'" aria-pressed="'+(f.rs===o[0])+'">'+o[1]+'</button>'}).join("")+
-    '<span class="lbl" style="margin-left:6px">絞りこみ</span>'+[["all","ぜんぶ"],["ok","パスが1人もいない"]].map(function(o){return '<button class="chipbtn" data-rg="'+o[0]+'" aria-pressed="'+(f.rg===o[0])+'">'+o[1]+'</button>'}).join("")+'</div>'+
+    '<div class="row"><span class="lbl">並び</span>'+[["score","人気順"],["time","時間が短い順"]].map(function(o){return '<button class="chipbtn" data-rs="'+o[0]+'" aria-pressed="'+(f.rs===o[0])+'">'+o[1]+'</button>'}).join("")+'</div>'+
     '<div class="legend"><span><span class="dot w">♥</span> やりたい（2点）</span><span><span class="dot i">☆</span> 興味あり（1点）</span><span><span class="dot n">−</span> プレイ済みor別のがいい</span><span><span class="dot e">?</span> 未入力</span></div></section>';
-  h+='<div class="tblwrap"><table class="res"><thead><tr><th class="t">作品（押すと詳細）</th><th>点</th>'+ps.map(function(p){return '<th>'+esc(p.name)+'</th>'}).join("")+'</tr></thead><tbody>'+
-    (rows.length?rows.map(function(r){
-      return '<tr class="'+(r.c.n?'hasng':'')+'"><td class="t"><button data-detail="'+r.w.id+'">'+esc(r.w.t)+'</button><small>'+esc(r.w.p)+'・'+esc(r.w.m)+(/\d$/.test(r.w.m)?'分':'')+'</small></td>'+
-        '<td class="score">'+r.score+'</td>'+
-        ps.map(function(p){var v=p.mm[r.w.id];return '<td><span class="dot '+(v||"e")+'" title="'+esc(p.name)+'：'+(v?V[v].t:"未入力")+'">'+(v==="w"?"♥":v==="i"?"☆":v==="n"?"−":"?")+'</span></td>'}).join("")+'</tr>';
-    }).join(""):'<tr><td colspan="'+(2+ps.length)+'" class="empty">この条件の作品はありません</td></tr>')+'</tbody></table></div>';
+  function table(list,rank){
+    return '<div class="tblwrap"><table class="res"><thead><tr><th class="t">作品（押すと詳細）</th><th>点</th>'+ps.map(function(p){return '<th>'+esc(p.name)+'</th>'}).join("")+'</tr></thead><tbody>'+
+      list.map(function(r,i){
+        return '<tr class="'+(r.c.n?'hasng':'')+'"><td class="t"><button data-detail="'+r.w.id+'">'+(rank&&f.rs==="score"?'<span class="rk">'+(i+1)+'</span>':'')+esc(r.w.t)+'</button><small>'+esc(r.w.p)+'・'+esc(r.w.m)+(/\d$/.test(r.w.m)?'分':'')+(r.c.e&&!r.c.n?'・未入力 '+r.c.e+'人':'')+'</small></td>'+
+          '<td class="score">'+(r.c.n?'−':r.score)+'</td>'+
+          ps.map(function(p){var v=p.mm[r.w.id];return '<td><span class="dot '+(v||"e")+'" title="'+esc(p.name)+'：'+(v?V[v].t:"未入力")+'">'+(v==="w"?"♥":v==="i"?"☆":v==="n"?"−":"?")+'</span></td>'}).join("")+'</tr>';
+      }).join("")+'</tbody></table></div>';
+  }
+  h+=ok.length?table(ok,true):'<section class="panel empty">いま候補に残っている作品はありません</section>';
+  if(out.length)h+='<details class="panel outfold"><summary>候補から外れた作品（パスあり）'+out.length+'作</summary>'+table(out,false)+'</details>';
   return h;
 }
 function openDetail(id){
@@ -413,7 +422,6 @@ document.addEventListener("click",function(e){
   if(t.dataset.ch){f.ch[t.dataset.ch]=!f.ch[t.dataset.ch];saveView();render();return}
   if(t.dataset.sort){f.sort=t.dataset.sort;saveView();render();return}
   if(t.dataset.rs){f.rs=t.dataset.rs;saveView();render();return}
-  if(t.dataset.rg){f.rg=t.dataset.rg;saveView();render();return}
   if(t.dataset.bulk&&mine){bulk(t.dataset.bulk);return}
   if(t.dataset.detail){openDetail(t.dataset.detail);return}
   if(t.dataset.v&&t.dataset.w&&mine){
