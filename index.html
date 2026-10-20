@@ -386,6 +386,12 @@
   .slot{border-bottom:1px solid var(--line)}
   .prev{margin:0;font-size:.76rem;font-weight:700;color:var(--muted);background:rgba(255,255,255,.55);border-radius:12px;padding:6px 10px}
   .prev.ok{color:#1f7a52;background:rgba(126,226,176,.35)}
+  td.cw{vertical-align:top}
+  .untl{display:block;margin-top:2px;font-size:.6rem;font-weight:800;line-height:1.2;color:#2f78b7;white-space:nowrap}
+  .untl.late{color:#d2335a}
+  .untl.none{color:var(--muted);font-weight:700}
+  .mini .mu{font-size:.62rem;color:#2f78b7;font-weight:800}
+  .mini .mu.late{color:#d2335a}
   .share .btn[disabled]{opacity:.6;cursor:default;background:rgba(255,255,255,.6)}
   .share details.fold{box-shadow:none;background:rgba(255,255,255,.45)}
   .share details.fold input{margin-top:6px;font-size:.8rem}
@@ -751,6 +757,12 @@ function analyze(ev,skip){
     return {d:d,g:g,tier:tier,ti:worst,maxUntil:maxUntil};
   }).sort(function(a,b){return a.ti-b.ti||a.g.ka.length-b.g.ka.length||(a.maxUntil<b.maxUntil?-1:a.maxUntil>b.maxUntil?1:0)||(a.d<b.d?-1:1)});
 }
+/* △待（並行調整中）の「いつ分かるか」を出欠表のセルの下に出す。過ぎていたら赤く */
+function untilTag(c,v){
+  if(v!=="machi"||!c||!c.until)return v==="machi"?'<span class="untl none">いつ？</span>':'';
+  var late=c.until<today();
+  return '<span class="untl'+(late?' late':'')+'" title="'+(late?'分かる予定の日を過ぎています':'この日までに分かる予定')+'">'+(late?'⏰':'〜')+md(c.until)+'</span>';
+}
 function names(arr){return arr.map(function(x){return esc(x.n)}).join("・")}
 
 /* ---- タブと試作用のきりかえ（本番は1ページ＝1募集） ---- */
@@ -850,7 +862,7 @@ function renderRes(){
         mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=c?(c.conf?"kiken":c.v):"-",m=SYM[v];
           var tip=c?((c.conf?"別の予定が確定":"")+(c.c?(c.conf?"／":"")+c.c:"")):"未回答";
           return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf))?' has-c':'')+'" title="'+esc(n+"："+m.label+(tip?"（"+tip+"）":""))+'">'+
-            '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':'')+'</span></td>'}).join("")+'</tr>'}).join("")+
+            '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':'')+'</span>'+untilTag(c,v)+'</td>'}).join("")+'</tr>'}).join("")+
     '</tbody></table></div><p class="note">右上の点はひとことあり、⚠ は別の予定がその日に確定した人です。✕ の行は来られない人がいる日です。</p>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
@@ -969,7 +981,7 @@ function renderAns(){
     ev.dates.slice().sort().map(function(d){var r=draft.rows[d],tr=tierBy[d],t=tierObj(tr);
       var others=mem.filter(function(n){return norm(n)!==norm(draft.name)}).map(function(n){
         var c=cellOf(ev,L,n,d),v=c?(c.conf?"kiken":c.v):"-",m=SYM[v],note=c?(c.conf?"別の予定が確定":c.c):"未回答";
-        return '<span class="mini s-'+(v==="-"?"none":v)+'" title="'+esc(n+"："+m.label+(note?"（"+note+"）":""))+'"><b>'+m.g+(m.sub?'<i>'+m.sub+'</i>':'')+'</b>'+esc(n)+(c&&(c.c||c.conf)?'<u>●</u>':'')+'</span>'}).join("");
+        return '<span class="mini s-'+(v==="-"?"none":v)+'" title="'+esc(n+"："+m.label+(note?"（"+note+"）":""))+'"><b>'+m.g+(m.sub?'<i>'+m.sub+'</i>':'')+'</b>'+esc(n)+(v==="machi"&&c&&c.until?'<small class="mu'+(c.until<today()?' late':'')+'">'+md(c.until)+'まで</small>':'')+(c&&(c.c||c.conf)?'<u>●</u>':'')+'</span>'}).join("");
       var x='<div class="arow'+(r.ref?' ref':'')+'"><div class="arow-top">'+dlHtml(d)+'<div class="symrow">'+ORDER.map(function(v){return symBtn(v,"set",d,r.v===v)}).join("")+'</div>'+
         '<button class="cbtn'+(r.c?' has':'')+'" data-cm="'+d+'" aria-label="'+dl(d)+'のひとこと">💬</button></div>'+
         '<div class="others"><span class="tmark sm t-'+tr.tier+'">'+t.mark+' '+t.name+'</span>'+others+'</div>';
