@@ -390,6 +390,14 @@
   .share details.fold input{margin-top:6px;font-size:.8rem}
   .note a{color:#6a55f0;font-weight:700}
   .far{display:flex;flex-direction:column;gap:8px}
+  /* フリカレに予定がある日：右上に小さい点＋うすい色 */
+  .cal button.busy{position:relative;background:rgba(255,179,107,.22)}
+  .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
+  .cal button.busy.on{background:var(--grad)}
+  .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .busynote i{display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,179,107,.35);position:relative;flex:none}
+  .busynote i::after{content:"";position:absolute;top:1px;right:1px;width:5px;height:5px;border-radius:50%;background:#ff9d4d}
+  .busytxt{font-size:.74rem;font-weight:700;color:#b5651d;background:rgba(255,179,107,.18);border-radius:10px;padding:2px 8px;min-width:0;overflow-wrap:anywhere}
   .far select{border:1px solid rgba(139,123,255,.35);border-radius:14px;background:rgba(255,255,255,.85);padding:8px 12px;font-size:.95rem;max-width:16rem}
   /* 名前の候補：回答ずみ（✓）でも、選んでいるものはグラデーションに */
   .members .chipbtn.done[aria-pressed="true"]{background:var(--grad);color:#fff}
@@ -970,6 +978,30 @@ function symBtn(v,act,d,on){
 
 /* ---- 作る ---- */
 var nd={dates:{},drag:null};
+/* ---- 幹事の予定（フリカレ）----
+   作成画面のカレンダーで「予定がある日」に色を付けるためだけに使う。結果・回答の画面では使わない。
+   busy.json は暗号化してあり、鍵を入れた端末でだけ読める。鍵は ?busykey=<鍵> で1回開くと端末に保存される */
+var BUSY=null, BUSYKEY="sorouhi.busykey";
+(function(){var k=Q.get("busykey");if(!k)return;
+  store(BUSYKEY,k);Q.delete("busykey");
+  try{history.replaceState(null,"",location.pathname+(Q.toString()?"?"+Q.toString():""))}catch(e){}
+  setTimeout(function(){toast("この端末でフリカレの予定を表示します")},300);
+})();
+function b64(s){var b=atob(s.replace(/-/g,"+").replace(/_/g,"/")),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+function loadBusy(){
+  var k=store(BUSYKEY);if(!k||DEMO||!window.crypto||!crypto.subtle)return;
+  fetch(BASE+"busy.json",{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){
+    return crypto.subtle.importKey("raw",b64(k),"AES-GCM",false,["decrypt"]).then(function(key){
+      return crypto.subtle.decrypt({name:"AES-GCM",iv:b64(j.iv)},key,b64(j.ct))});
+  }).then(function(buf){
+    BUSY=JSON.parse(new TextDecoder().decode(buf)).days||{};
+    if(tab!=="new")return;
+    /* 入力中の内容を消さないよう、画面は描き直さずに印だけ付ける */
+    document.querySelectorAll(".cal button[data-day]").forEach(function(b){var t=BUSY[b.dataset.day];if(t){b.classList.add("busy");b.title=t}});
+    var n=document.getElementById("busyNote");if(n)n.hidden=false;
+    refreshPicked();
+  }).catch(function(){});
+}
 /* カレンダーは半年分を常に出す。その先（2年後まで）はプルダウンで月を選ぶと、その月のカレンダーが出る */
 var CAL_FIRST=6, calMonths=CAL_FIRST, farMonth="";
 function farPicker(){
@@ -984,7 +1016,7 @@ function renderNew(){
   var t=new Date(),h='<section class="panel"><div class="sec-h" style="margin:0">新しい募集</div>'+
     '<label class="f" for="nTitle">タイトル<input type="text" id="nTitle" placeholder="例）新年会の日決め"></label>'+
     '<label class="f" for="nMemo">詳細（任意）<textarea id="nMemo" placeholder="例）お店は日が決まってから予約します&#10;https://… のURLは押せるリンクになります"></textarea></label>'+
-    '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><div class="cals" id="cals">';
+    '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><p class="note busynote" id="busyNote"'+(BUSY?'':' hidden')+'><i></i>の日はフリカレに予定がある日です（この端末にだけ表示）</p><div class="cals" id="cals">';
   for(var i=0;i<calMonths;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);h+=calHtml(m)}
   h+='</div>'+farPicker()+'<label class="f" for="nTime">はじめに入る時刻<input type="text" id="nTime" list="timeList" value="19:00〜"></label>'+
     '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
@@ -1002,14 +1034,15 @@ function calHtml(m){
   var h='<div class="cal"><h4>'+y+'年 '+(mo+1)+'月</h4><div class="g">'+"日月火水木金土".split("").map(function(w){return '<span class="w">'+w+'</span>'}).join("");
   for(var i=0;i<first;i++)h+='<span></span>';
   for(var d=1;d<=n;d++){var s=iso(new Date(y,mo,d));
-    h+='<button data-day="'+s+'" class="'+dowClass(s)+(nd.dates[s]?' on':'')+'"'+(s<td?' disabled':'')+'>'+d+'</button>'}
+    var bz=BUSY&&BUSY[s];
+    h+='<button data-day="'+s+'" class="'+dowClass(s)+(nd.dates[s]?' on':'')+(bz?' busy':'')+'"'+(bz?' title="'+esc(bz)+'"':'')+(s<td?' disabled':'')+'>'+d+'</button>'}
   return h+'</div></div>';
 }
 function refreshPicked(){
   var el=document.getElementById("picked");if(!el)return;
   var ds=Object.keys(nd.dates).sort();
   el.innerHTML=ds.length?ds.map(function(d){
-    return '<div class="slot">'+dlHtml(d)+'<div class="slot-times">'+nd.dates[d].map(function(t,i){
+    return '<div class="slot">'+dlHtml(d)+(BUSY&&BUSY[d]?'<span class="busytxt">📅 '+esc(BUSY[d])+'</span>':'')+'<div class="slot-times">'+nd.dates[d].map(function(t,i){
       return '<span class="tin"><input type="text" id="t-'+d+'-'+i+'" list="timeList" data-tday="'+d+'" data-ti="'+i+'" value="'+esc(t)+'" placeholder="時刻" aria-label="'+dl(d)+'の時刻"><button class="tdel" data-tdel="'+d+'|'+i+'" aria-label="この候補を消す">✕</button></span>'}).join("")+
       '<button class="btn sub sm" data-tadd="'+d+'">＋</button></div></div>'}).join(""):'<span class="note">まだ選んでいません</span>';
   document.querySelectorAll(".cal button[data-day]").forEach(function(b){b.classList.toggle("on",!!nd.dates[b.dataset.day])});
@@ -1167,6 +1200,7 @@ document.addEventListener("pointercancel",function(){nd.drag=null});
 
 render();
 if(EID&&READY&&!DEMO)refresh();
+if(tab==="new")loadBusy();
 })();
 </script>
 </body>

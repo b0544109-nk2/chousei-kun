@@ -92,6 +92,34 @@ for (const [id, j] of Object.entries(events)) {
 }
 // サイト本体のファイルが変わったときも公開しなおすよう、本体の指紋も入れる
 manifest._site = createHash('sha1').update(tpl + readFileSync('404.html', 'utf8') + cfgText).digest('hex').slice(0, 12);
+
+// ---- 幹事の予定（フリカレ）を暗号化して busy.json に ----
+// 募集を作る画面のカレンダーで「予定がある日」に色を付けるためだけに使う。
+// サイトは誰でも見られるので中身は AES-256-GCM で暗号化し、鍵（BUSY_KEY）を入れた端末でだけ読める。
+// FREECAL_PATH（freecal-backup の data/calendar.json）と BUSY_KEY が無ければ何もしない。
+const busyPath = process.env.FREECAL_PATH, busyKey = process.env.BUSY_KEY;
+if (busyPath && busyKey && existsSync(busyPath)) {
+  const cal = JSON.parse(readFileSync(busyPath, 'utf8'));
+  const jst = new Date(Date.now() + 9 * 3600e3);
+  const from = jst.toISOString().slice(0, 10);
+  const to = new Date(jst.getTime() + 730 * 864e5).toISOString().slice(0, 10);
+  const days = {};
+  for (const d of cal.days || []) {
+    const text = String(d.text || '').trim();
+    if (!d.date || d.date < from || d.date > to || !text) continue;   // 本文のある日だけ（色ラベルだけの日は除く）
+    days[d.date] = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 3).join(' / ').slice(0, 80);
+  }
+  const plain = JSON.stringify({ v: 1, at: cal.generated_at || '', days });
+  const { createCipheriv, randomBytes } = await import('node:crypto');
+  const key = Buffer.from(busyKey.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  if (key.length !== 32) throw new Error('BUSY_KEY は32バイト（base64url）にしてください');
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([c.update(plain, 'utf8'), c.final(), c.getAuthTag()]);   // WebCrypto と同じ「本文＋タグ」の並び
+  writeFileSync('_site/busy.json', JSON.stringify({ v: 1, iv: iv.toString('base64'), ct: ct.toString('base64') }));
+  manifest._busy = createHash('sha1').update(plain).digest('hex').slice(0, 12);   // 中身が同じなら公開しなおさない
+  console.log(`予定のある日 ${Object.keys(days).length} 日を暗号化しました`);
+}
 const manifestText = JSON.stringify(manifest);
 writeFileSync('_site/pages-manifest.json', manifestText);
 console.log(`募集 ${Object.keys(events).length} 件のページを作りました`);

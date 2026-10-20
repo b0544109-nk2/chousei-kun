@@ -26,8 +26,20 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.build.outputs.changed }}
+    env:
+      HAS_FREECAL: ${{ secrets.FREECAL_DEPLOY_KEY != '' && secrets.BUSY_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
+      # 幹事の予定（フリカレのバックアップ・private）を読みとり専用の鍵で取ってくる。
+      # 中身は build-pages.mjs で暗号化して busy.json にするだけで、そのままは公開しない
+      - if: env.HAS_FREECAL == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: b0544109-nk2/freecal-backup
+          ssh-key: ${{ secrets.FREECAL_DEPLOY_KEY }}
+          path: .freecal
+          sparse-checkout: data/calendar.json
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -35,6 +47,8 @@ jobs:
         run: node tools/build-pages.mjs
         env:
           EVENT_NAME: ${{ github.event_name }}
+          FREECAL_PATH: ${{ env.HAS_FREECAL == 'true' && '.freecal/data/calendar.json' || '' }}
+          BUSY_KEY: ${{ secrets.BUSY_KEY }}
       - if: steps.build.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
