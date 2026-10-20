@@ -176,7 +176,9 @@
   table.board{border-collapse:separate;border-spacing:4px;font-size:.8rem}
   table.board th,table.board td{padding:0;text-align:center;white-space:nowrap}
   table.board thead th{font-size:.74rem;font-weight:700;padding:2px 2px 4px;vertical-align:bottom}
-  table.board thead th.hn span{display:inline-block;max-width:4.2em;overflow:hidden;text-overflow:ellipsis}
+  /* 名前は切らずに折り返す（列の幅はセルの丸に合わせたまま、2〜3行で全部見せる） */
+  table.board thead th.hn{white-space:normal;vertical-align:bottom;max-width:3.6rem}
+  table.board thead th.hn span{display:block;max-width:3.6rem;margin:0 auto;white-space:normal;word-break:break-all;overflow-wrap:anywhere;line-height:1.2;font-size:.7rem}
   table.board thead th.off{color:#a39f92;text-decoration:line-through}
   table.board .hd{position:sticky;left:0;z-index:1;background:var(--card);text-align:left}
   table.board tbody th.hd button{display:block;width:100%;text-align:left;background:#fff;border:2px solid var(--ink);border-radius:10px;
