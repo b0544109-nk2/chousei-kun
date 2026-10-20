@@ -425,6 +425,11 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .decide{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-top:10px;border-top:1px dashed rgba(109,101,133,.3)}
+  .decide-h{font-size:.78rem;font-weight:800;color:var(--muted)}
+  .dbtn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+  .dbtn span{font-weight:800}
+  .btn.go2{background:var(--grad);color:#fff;border:none}
   .copybox{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .copybox:empty{display:none}
   .copybox select{flex:1 1 12rem;min-width:0;border:1px solid rgba(139,123,255,.35);border-radius:14px;background:rgba(255,255,255,.85);padding:8px 12px;font-size:.9rem}
@@ -957,7 +962,8 @@ function renderRes(){
     var big=best.tier==="empty"?"まだ回答がありません。URLを送って回答を集めましょう":okDates.length?"全員そろうのは "+okDates.join("・"):best.tier==="out"?"いまは全員そろう日がありません":"いちばん近いのは "+dl(best.d)+"（"+t.name+"）";
     var n=Object.keys(L).length;
     h+='<section class="summary"><div class="big">'+esc(big)+'</div><p>'+(ev.count&&n>=ev.count?"🎉 全員（"+ev.count+"人）の回答がそろいました！みんなに連絡しましょう。":ev.count?"いま "+n+" / "+ev.count+"人が回答しています。あと"+(ev.count-n)+"人です。":n?"いま "+n+"人が回答しています。回答が増えると結果が変わります。":"URLを配って、回答を集めましょう。")+'</p>'+
-      (ev.count&&n>=ev.count?'<div class="row"><button class="btn sm" id="doneCopy">結果を知らせる文をコピー</button></div>':'')+'</section>';
+      (ev.count&&n>=ev.count?'<div class="row"><button class="btn sm" id="doneCopy">結果を知らせる文をコピー</button></div>':'')+
+      decideBox(ev,rows)+'</section>';
     h+=shareBox(ev);
   }
   /* 出欠表：行＝候補日、列＝人。行を押すと下にその日のくわしい内容 */
@@ -980,6 +986,15 @@ function renderRes(){
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
   h+='<section class="panel"><div class="legend">'+["o","ka","machi","kiken","x"].map(function(v){return '<div>'+symHtml(v)+SYM[v].label+'</div>'}).join("")+'</div></section>';
   return h;
+}
+/* 幹事用：まとめのすぐ下に「この日に決める」（全員そろう順の上位3つ）。出欠表の下まで行かなくても決められる */
+function decideBox(ev,rows){
+  if(ev.decided||!isOwner(ev.id))return "";
+  var c=rows.filter(function(r){return r.tier!=="out"&&r.tier!=="empty"}).slice(0,3);
+  if(!c.length)return "";
+  return '<div class="decide"><div class="decide-h">この日に決める</div>'+c.map(function(r){var t=tierObj(r);
+    if(confirmDate===r.d)return '<div class="confirm">'+esc(dl(r.d))+' に決めますか？<button class="btn sm go2" data-decide="'+r.d+'">決める</button><button class="btn sub sm" data-cancel="1">やめる</button></div>';
+    return '<button class="btn sm dbtn" data-ask="'+r.d+'"><span>'+esc(dl(r.d))+'</span><small class="tmark sm t-'+r.tier+'">'+t.mark+' '+t.name+'</small></button>'}).join("")+'</div>';
 }
 function card(ev,r){
   var t=tierObj(r),g=r.g,desc;
