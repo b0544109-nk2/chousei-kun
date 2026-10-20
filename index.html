@@ -389,6 +389,8 @@
   .share details.fold{box-shadow:none;background:rgba(255,255,255,.45)}
   .share details.fold input{margin-top:6px;font-size:.8rem}
   .note a{color:#6a55f0;font-weight:700}
+  .far{display:flex;flex-direction:column;gap:8px}
+  .far select{border:1px solid rgba(139,123,255,.35);border-radius:14px;background:rgba(255,255,255,.85);padding:8px 12px;font-size:.95rem;max-width:16rem}
   /* 名前の候補：回答ずみ（✓）でも、選んでいるものはグラデーションに */
   .members .chipbtn.done[aria-pressed="true"]{background:var(--grad);color:#fff}
   .members .chipbtn.done[aria-pressed="true"]::after{color:#fff}
@@ -968,13 +970,23 @@ function symBtn(v,act,d,on){
 
 /* ---- 作る ---- */
 var nd={dates:{},drag:null};
+/* カレンダーは半年分を常に出す。その先（2年後まで）はプルダウンで月を選ぶと、その月のカレンダーが出る */
+var CAL_FIRST=6, calMonths=CAL_FIRST, farMonth="";
+function farPicker(){
+  var t=new Date(),o='<option value="">その先の月をえらぶ…</option>';
+  for(var i=CAL_FIRST;i<24;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1),v=m.getFullYear()+"-"+(m.getMonth()+1);
+    o+='<option value="'+v+'"'+(v===farMonth?' selected':'')+'>'+m.getFullYear()+'年 '+(m.getMonth()+1)+'月</option>'}
+  var shown="";if(farMonth){var a=farMonth.split("-");shown=calHtml(new Date(+a[0],a[1]-1,1))}
+  return '<div class="far"><label class="f" for="farPick" style="font-size:.8rem">半年より先の候補日<select id="farPick">'+o+'</select></label>'+
+    '<div class="cals" id="farCal">'+shown+'</div></div>';
+}
 function renderNew(){
   var t=new Date(),h='<section class="panel"><div class="sec-h" style="margin:0">新しい募集</div>'+
     '<label class="f" for="nTitle">タイトル<input type="text" id="nTitle" placeholder="例）新年会の日決め"></label>'+
     '<label class="f" for="nMemo">詳細（任意）<textarea id="nMemo" placeholder="例）お店は日が決まってから予約します&#10;https://… のURLは押せるリンクになります"></textarea></label>'+
-    '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><div class="cals">';
-  for(var i=0;i<3;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);h+=calHtml(m)}
-  h+='</div><label class="f" for="nTime">はじめに入る時刻<input type="text" id="nTime" list="timeList" value="19:00〜"></label>'+
+    '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><div class="cals" id="cals">';
+  for(var i=0;i<calMonths;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);h+=calHtml(m)}
+  h+='</div>'+farPicker()+'<label class="f" for="nTime">はじめに入る時刻<input type="text" id="nTime" list="timeList" value="19:00〜"></label>'+
     '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
     '<div class="row"><button class="btn sub sm" data-tall="1">選んだ日を全部この時刻にする</button></div>'+
     '<div class="picked" id="picked"></div>'+
@@ -1129,6 +1141,12 @@ document.addEventListener("input",function(e){
   if(t.dataset.until){draft.rows[t.dataset.until].until=t.value}
 });
 document.addEventListener("change",function(e){if(e.target.id==="ansName")setName(e.target.value)});
+document.addEventListener("change",function(e){
+  if(e.target.id!=="farPick")return;
+  farMonth=e.target.value;var box=document.getElementById("farCal");if(!box)return;
+  if(!farMonth){box.innerHTML="";return}
+  var a=farMonth.split("-");box.innerHTML=calHtml(new Date(+a[0],a[1]-1,1));refreshPicked();
+});
 document.addEventListener("keydown",function(e){if(e.target.id==="ansName"&&e.key==="Enter"){e.preventDefault();setName(e.target.value)}});
 
 /* カレンダー：タップで切りかえ、なぞって範囲 */
