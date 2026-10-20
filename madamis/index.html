@@ -97,6 +97,10 @@
   .ch[aria-pressed="true"].c-n{background:var(--ng);color:#fff;border-color:transparent}
   .ch[aria-pressed="true"] small{color:inherit;opacity:.85}
   .ch:active{transform:scale(.97)}
+  .bulk{display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.45);border:1px solid var(--glass-edge);border-radius:20px;padding:10px 12px}
+  .bulkbtns{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:6px;align-items:center}
+  .bulkbtns .ch{padding:8px 4px;font-size:.8rem}
+  @media (max-width:520px){.bulkbtns{grid-template-columns:repeat(3,1fr)}.bulkbtns .btn{grid-column:1/-1;justify-self:end}}
   .others{display:flex;flex-wrap:wrap;gap:4px}
   .pill{font-size:.7rem;font-weight:800;border-radius:999px;padding:2px 8px;background:rgba(255,255,255,.6)}
   .pill.w{background:var(--want-bg);color:#c2386f}
@@ -168,7 +172,7 @@ var CHAINS=[["JOL","ジョルディーノ"],["QW","クインズワルツ"],["ZAN
 /* ================= 状態 ================= */
 var S={rows:[],loaded:DEMO,err:""};
 var tab="in", mine=null, saveState="", f=loadView();
-function loadView(){var d={g:"all",ch:{},only:"",sort:"time",rs:"score",rg:"all"};try{var j=JSON.parse(store(VIEW)||"{}");for(var k in j)d[k]=j[k]}catch(e){}return d}
+function loadView(){var d={ch:{},sort:"time",rs:"score",rg:"all"};try{var j=JSON.parse(store(VIEW)||"{}");for(var k in d)if(k in j)d[k]=j[k]}catch(e){}return d}
 function saveView(){store(VIEW,JSON.stringify(f))}
 
 /* ================= シート ================= */
@@ -249,7 +253,6 @@ function wById(id){for(var i=0;i<WORKS.length;i++)if(WORKS[i].id===id)return WOR
 function shown(list){
   var chOn=Object.keys(f.ch).filter(function(k){return f.ch[k]});
   return list.filter(function(w){
-    if(f.g!=="all"&&w.g!==f.g)return false;
     if(chOn.length&&!w.ch.some(function(c){return f.ch[c]}))return false;
     return true;
   });
@@ -295,12 +298,8 @@ function render(){
   app.innerHTML=h;
 }
 function filterBar(withOnly){
-  var h='<div class="row"><span class="lbl">区分</span>'+
-    [["all","すべて"],["main","6人固定あり"],["extra","番外（範囲に6人）"]].map(function(o){return '<button class="chipbtn" data-g="'+o[0]+'" aria-pressed="'+(f.g===o[0])+'">'+o[1]+'</button>'}).join("")+'</div>'+
-    '<div class="row"><span class="lbl">店舗</span>'+CHAINS.map(function(c){return '<button class="chipbtn" data-ch="'+c[0]+'" aria-pressed="'+!!f.ch[c[0]]+'">'+c[1]+'</button>'}).join("")+'</div>';
-  if(withOnly)h+='<div class="row"><span class="lbl">表示</span>'+
-    [["","ぜんぶ"],["todo","まだ選んでいない"],["w","やりたい"],["i","興味あり"],["n","パス"]].map(function(o){return '<button class="chipbtn" data-only="'+o[0]+'" aria-pressed="'+(f.only===o[0])+'">'+o[1]+'</button>'}).join("")+
-    '<span class="lbl" style="margin-left:6px">並び</span>'+[["time","時間が短い順"],["title","タイトル順"]].map(function(o){return '<button class="chipbtn" data-sort="'+o[0]+'" aria-pressed="'+(f.sort===o[0])+'">'+o[1]+'</button>'}).join("")+'</div>';
+  var h='<div class="row"><span class="lbl">店舗</span>'+CHAINS.map(function(c){return '<button class="chipbtn" data-ch="'+c[0]+'" aria-pressed="'+!!f.ch[c[0]]+'">'+c[1]+'</button>'}).join("")+'</div>';
+  if(withOnly)h+='<div class="row"><span class="lbl">並び</span>'+[["time","時間が短い順"],["title","タイトル順"]].map(function(o){return '<button class="chipbtn" data-sort="'+o[0]+'" aria-pressed="'+(f.sort===o[0])+'">'+o[1]+'</button>'}).join("")+'</div>';
   return h;
 }
 function inputView(){
@@ -314,13 +313,14 @@ function inputView(){
   var all=shown(WORKS), done=all.filter(function(w){return mine.mm[w.id]}).length;
   h+='<section class="panel">'+filterBar(true)+
     '<div class="row" style="justify-content:space-between"><span class="lbl">'+esc(mine.name)+'さん：'+done+' / '+all.length+' 作品を選びました</span><span class="save" id="save"></span></div>'+
+    '<div class="bulk"><span class="lbl">まとめて入力</span><div class="bulkbtns">'+["w","i","n"].map(function(k){return '<button class="ch c-'+k+'" aria-pressed="true" data-bulk="'+k+'">'+V[k].t+'</button>'}).join("")+
+      '<button class="btn sm" data-bulk="clear">ぜんぶ消す</button></div><p class="note">まだ選んでいない作品にまとめて入ります（選んだ作品はそのまま）。店舗で絞っているときは、表示中の作品だけ。</p></div>'+
     '<div class="prog"><span style="width:'+(all.length?Math.round(done/all.length*100):0)+'%"></span></div></section>';
   var list=sortWorks(all).filter(function(w){var v=mine.mm[w.id];
-    if(f.only==="todo")return !v; if(f.only)return v===f.only; return true});
+    return true});
   h+='<div class="list">'+(list.length?list.map(function(w){
     var v=mine.mm[w.id]||"";
-    return '<article class="work'+(v?' v-'+v:'')+'" id="w-'+w.id+'"><div class="wt"><h3>'+(w.md?'<a href="'+esc(w.md)+'" target="_blank" rel="noopener">'+esc(w.t)+'</a>':esc(w.t))+'</h3>'+
-      (w.g==="extra"?'<span class="tag ex">番外</span>':'<span class="tag">6人固定あり</span>')+'</div>'+
+    return '<article class="work'+(v?' v-'+v:'')+'" id="w-'+w.id+'"><div class="wt"><h3>'+(w.md?'<a href="'+esc(w.md)+'" target="_blank" rel="noopener">'+esc(w.t)+'</a>':esc(w.t))+'</h3>'+'</div>'+
       factsHtml(w)+
       '<div class="choices">'+["w","i","n"].map(function(k){return '<button class="ch c-'+k+'" data-v="'+k+'" data-w="'+w.id+'" aria-pressed="'+(v===k)+'">'+V[k].t+'<small>'+V[k].s+'</small></button>'}).join("")+'</div>'+
       othersHtml(w,ps,mine.name)+'</article>';
@@ -364,8 +364,28 @@ function openDetail(id){
     '<div><button class="btn go sm" data-goin="'+w.id+'">この作品を入力する</button></div></div>';
   m.addEventListener("click",function(e){
     if(e.target===m||e.target.hasAttribute("data-close")){m.remove();return}
-    var g=e.target.closest("[data-goin]");if(g){m.remove();tab="in";f.only="";render();var el=document.getElementById("w-"+g.getAttribute("data-goin"));if(el)el.scrollIntoView({block:"center"})}
+    var g=e.target.closest("[data-goin]");if(g){m.remove();tab="in";render();var el=document.getElementById("w-"+g.getAttribute("data-goin"));if(el)el.scrollIntoView({block:"center"})}
   });
+  document.body.appendChild(m);
+}
+function bulk(k){
+  var list=shown(WORKS);
+  if(k==="clear"){
+    var on=list.filter(function(w){return mine.mm[w.id]});
+    if(!on.length){toast("消すものはありません");return}
+    askClear(on.length,function(){on.forEach(function(w){delete mine.mm[w.id]});render();queueSave();toast(on.length+"作品の入力を消しました")});
+    return;
+  }
+  var todo=list.filter(function(w){return !mine.mm[w.id]});
+  if(!todo.length){toast("まだ選んでいない作品はありません");return}
+  todo.forEach(function(w){mine.mm[w.id]=k});
+  render();queueSave();toast(todo.length+"作品を「"+V[k].t+"」にしました");
+}
+function askClear(n,ok){
+  var m=document.createElement("div");m.className="modal";
+  m.innerHTML='<div class="modal-card" role="dialog" aria-modal="true"><h3 style="margin:0">入力を消しますか？</h3><p class="note">'+(Object.keys(f.ch).some(function(c){return f.ch[c]})?"表示中の":"")+n+'作品の選択を消します。</p>'+
+    '<div class="row"><button class="btn" data-no>やめる</button><button class="btn go" data-yes>消す</button></div></div>';
+  m.addEventListener("click",function(e){if(e.target===m||e.target.hasAttribute("data-no")){m.remove();return}if(e.target.hasAttribute("data-yes")){m.remove();ok()}});
   document.body.appendChild(m);
 }
 function paintSave(){var el=document.getElementById("save");if(!el)return;
@@ -387,12 +407,11 @@ document.addEventListener("click",function(e){
   if(t.dataset.act==="setname"){setName(document.getElementById("nm").value);return}
   if(t.dataset.act==="reload"){S.err="";render();refresh();return}
   if(t.dataset.pick!=null){setName(t.dataset.pick);return}
-  if(t.dataset.g){f.g=t.dataset.g;saveView();render();return}
   if(t.dataset.ch){f.ch[t.dataset.ch]=!f.ch[t.dataset.ch];saveView();render();return}
-  if(t.dataset.only!=null){f.only=t.dataset.only;saveView();render();return}
   if(t.dataset.sort){f.sort=t.dataset.sort;saveView();render();return}
   if(t.dataset.rs){f.rs=t.dataset.rs;saveView();render();return}
   if(t.dataset.rg){f.rg=t.dataset.rg;saveView();render();return}
+  if(t.dataset.bulk&&mine){bulk(t.dataset.bulk);return}
   if(t.dataset.detail){openDetail(t.dataset.detail);return}
   if(t.dataset.v&&t.dataset.w&&mine){
     var id=t.dataset.w,v=t.dataset.v;
