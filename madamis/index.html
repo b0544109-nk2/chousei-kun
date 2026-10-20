@@ -39,7 +39,7 @@
   header{display:flex;flex-direction:column;gap:6px}
   .kicker{align-self:flex-start;background:var(--grad);color:#fff;font-weight:800;font-size:.75rem;padding:4px 12px;border-radius:999px}
   h1{margin:0;font-size:1.55rem;font-weight:800;letter-spacing:.01em}
-  h1 .dot{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1 .bang{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   .lead{margin:0;color:var(--muted);font-size:.86rem}
   .panel,.work,.modal-card{background:var(--glass);border:1px solid var(--glass-edge);border-radius:24px;box-shadow:var(--shadow);
     -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
@@ -158,8 +158,8 @@ var CFG=window.SOROU_CONFIG||{}, WORKS=window.MM_WORKS||[];
 var Q=new URLSearchParams(location.search), DEMO=Q.has("demo");
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}}
 function safeId(s){return String(s||"").replace(/[^A-Za-z0-9_-]/g,"")}
-/* 招待URLの鍵：URLにあれば端末に覚えて、URLからは消す（スクショやコピーで広がりにくく） */
-var KEY=safeId(Q.get("k"));
+/* 招待URLの鍵：URL（?k= か #k=）にあれば端末にも覚える。URLからは消さない（LINEのブラウザなどで保存できなくても再読み込みで開けるように） */
+var KEY=safeId(Q.get("k")||new URLSearchParams(location.hash.slice(1)).get("k"));
 if(KEY){store("mm6.key",KEY);}else KEY=safeId(store("mm6.key"));
 var EID=DEMO?"demo":(KEY?"mm6_"+KEY:"");
 var READY=!!(CFG.sheetId&&CFG.forms&&CFG.forms.answer);
@@ -284,9 +284,10 @@ function othersHtml(w,ps,skip){
 /* ================= 画面 ================= */
 function render(){
   var app=document.getElementById("app");
-  var h='<header><span class="kicker">6人で遊べるマダミス</span><h1>マダミスえらび<span class="dot">！</span></h1>'+
+  var h='<header><span class="kicker">6人で遊べるマダミス</span><h1>マダミスえらび<span class="bang">！</span></h1>'+
     '<p class="lead">作品ごとに「やりたい！」「興味あり！」「プレイ済みor別のがいい！」を選んでください。押したら自動で保存されます。</p></header>';
-  if(!EID){app.innerHTML=h+'<section class="panel lock"><h2>🔒 招待URLから開いてください</h2><p class="note">このページは、配られたURL（最後に ?k=… が付いたもの）で開くと使えます。一度開けば、この端末では次から鍵なしで開けます。</p></section>';return}
+  if(!EID){app.innerHTML=h+'<section class="panel lock"><h2>🔒 招待URLから開いてください</h2><p class="note">配られたURL（最後に ?k=… が付いたもの）で開くと使えます。開けないときは、配られたURLをまるごと下に貼ってください。</p>'+
+    '<div class="row" style="justify-content:center;margin-top:10px"><input type="text" id="keyin" placeholder="URL または 鍵" autocomplete="off"><button class="btn go" data-act="key">開く</button></div></section>';return}
   if(!READY&&!DEMO){app.innerHTML=h+'<section class="panel lock"><h2>準備中です</h2><p class="note">シートの設定（config.js）が読めませんでした。</p></section>';return}
   h+='<nav class="tabs" role="tablist"><button class="tab" role="tab" data-tab="in" aria-selected="'+(tab==="in")+'">入力する</button>'+
      '<button class="tab" role="tab" data-tab="res" aria-selected="'+(tab==="res")+'">集計を見る</button></nav>';
@@ -405,6 +406,8 @@ document.addEventListener("click",function(e){
   var t=e.target.closest("button");if(!t)return;
   if(t.dataset.tab){tab=t.dataset.tab;render();window.scrollTo({top:0});return}
   if(t.dataset.act==="setname"){setName(document.getElementById("nm").value);return}
+  if(t.dataset.act==="key"){var raw=document.getElementById("keyin").value.trim(),m=raw.match(/[?#&]k=([A-Za-z0-9_-]+)/),k=safeId(m?m[1]:raw);
+    if(!k){toast("URL か 鍵 を貼ってください");return}store("mm6.key",k);location.href=location.pathname+"?k="+k;return}
   if(t.dataset.act==="reload"){S.err="";render();refresh();return}
   if(t.dataset.pick!=null){setName(t.dataset.pick);return}
   if(t.dataset.ch){f.ch[t.dataset.ch]=!f.ch[t.dataset.ch];saveView();render();return}
@@ -447,7 +450,6 @@ if(DEMO){
   var ids=WORKS.map(function(w){return w.id}),rnd=function(i,s){return ["w","i","n","","i"][(i*7+s*3)%5]};
   ["あお","みどり","きいろ"].forEach(function(n,s){var mm={};ids.forEach(function(id,i){var v=rnd(i,s);if(v)mm[id]=v});S.rows.push({name:n,mm:mm,ts:s,n:"d"+s})});
 }
-if(Q.has("k")){var u=new URL(location.href);u.searchParams.delete("k");history.replaceState(null,"",u.pathname+u.search+u.hash)}
 render();
 if(EID)refresh();
 </script>
