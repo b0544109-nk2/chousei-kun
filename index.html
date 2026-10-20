@@ -594,7 +594,7 @@ function save(){}
 
 /* 配った回答用URL（e/<ID>/、または転送後の ?e=<ID>&a）で開いたら、回答タブから始める。
    幹事が作った直後や ?e=<ID> で開いたときは結果タブ */
-var OPEN_ANS=!!PATH_ID||Q.has("a");
+var OPEN_ANS=(!!PATH_ID||Q.has("a"))&&!Q.has("r");   /* ?r（「結果はこちら」のリンク）なら結果タブ */
 var tab=EID&&OPEN_ANS?"ans":EID||DEMO?"res":"new", unstar={}, draft=null, confirmDate=null, sortMode="near", selDate=null;
 var loaded=DEMO, loadErr="", firstLoad=true;
 function cur(){return S.events.filter(function(e){return e.id===S.cur})[0]||(DEMO?S.events[0]:null)}
@@ -732,7 +732,7 @@ function refresh(){
     var ev=cur();
     if(ev&&firstLoad){firstLoad=false;
       var my=store(MYNAME),L=latest(ev.id),mine=my&&L[norm(my)];
-      if(!isOwner(ev.id)&&!mine&&!ev.decided)tab="ans";
+      if(!isOwner(ev.id)&&!mine&&!ev.decided&&!Q.has("r"))tab="ans";
       /* 回答タブで始まって、前にこの端末で答えた名前があれば、その回答を読みこんでおく */
       if(tab==="ans"&&!draft&&mine)draft=newDraft(ev,mine.name);
     }
@@ -902,6 +902,7 @@ function linkify(s){
 /* 回答用URL：GitHubの自動処理が作る募集ごとのページ（LINEなどのプレビューに〆切つきタイトルが出る）。
    できるまでの数分は 404.html が ?e=<ID> に転送するので、すぐ配っても開ける */
 function shareUrl(ev){return BASE+"e/"+ev.id+"/"}
+function resultUrl(ev){return shareUrl(ev)+"?r"}   /* 結果タブで開く */
 var pageReady={};
 function checkPage(ev){
   if(DEMO||pageReady[ev.id])return;
@@ -940,7 +941,7 @@ function shareBox(ev){
 /* 最後の1人が回答したときのお知らせ */
 function doneText(ev){
   var best=analyze(ev)[0],t=tierObj(best);
-  return "【"+ev.title+"】全員の回答がそろいました！\nいちばん近いのは "+dl(best.d)+"（"+t.name+"）\n結果はこちら → "+shareUrl(ev);
+  return "【"+ev.title+"】全員の回答がそろいました！\nいちばん近いのは "+dl(best.d)+"（"+t.name+"）\n結果はこちら → "+resultUrl(ev);
 }
 function showDone(ev){
   document.getElementById("doneBody").textContent=ev.count+"人ぶんの回答がそろいました。幹事さんやみんなに連絡しましょう！";
