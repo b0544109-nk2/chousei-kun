@@ -22,6 +22,67 @@ const SETUP = {
   pageUrl: 'https://b0544109-nk2.github.io/chousei-kun/',
 };
 
+/**
+ * 【プレビューを1〜2分で出すための追加設定】（1回だけ）
+ *   GitHubの5分ごとの自動実行は実際には数時間おきにしか動かないので、
+ *   シートに募集が届いた瞬間に GitHub へ「ページを作って」と知らせる。
+ *
+ *   1. GitHub で fine-grained のトークンを作る
+ *      https://github.com/settings/personal-access-tokens/new
+ *      - Repository access: Only select repositories → b0544109-nk2/chousei-kun だけ
+ *      - Permissions → Repository permissions → Contents: Read and write（ほかは触らない）
+ *      - 有効期限は1年など。できた github_pat_… をコピー
+ *   2. この Apps Script の左の歯車「プロジェクトの設定」→ いちばん下「スクリプト プロパティ」→
+ *      「プロパティを追加」で  プロパティ: GITHUB_TOKEN  値: さっきのトークン  → 保存
+ *   3. 関数の選択で enableQuickPreview を選んで実行 → 許可 → ログに「✅」と出ればOK
+ *   トークンの期限が切れたら、2 の値を新しいものに変えるだけでよい。
+ */
+const GITHUB_REPO = 'b0544109-nk2/chousei-kun';
+
+function enableQuickPreview() {
+  const book = newestBook_();
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'onSheetSubmit')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('onSheetSubmit').forSpreadsheet(book).onFormSubmit().create();
+  const code = dispatch_();
+  Logger.log(code === 204
+    ? '✅ 設定しました。これから募集が届くたびに、1〜2分でプレビュー用ページができます（対象: ' + book.getName() + '）'
+    : '⚠ GitHub に知らせられませんでした（HTTP ' + code + '）。トークンの権限（Contents: Read and write）と対象リポジトリを確認してください');
+}
+
+// シートにフォームの回答が届いたとき（トリガーから呼ばれる）。募集タブのときだけ GitHub に知らせる
+function onSheetSubmit(e) {
+  const name = e && e.range ? e.range.getSheet().getName() : '';
+  if (name === '募集') dispatch_();
+}
+
+function dispatch_() {
+  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) throw new Error('スクリプト プロパティに GITHUB_TOKEN がありません（上の説明の 2 を参照）');
+  const res = UrlFetchApp.fetch('https://api.github.com/repos/' + GITHUB_REPO + '/dispatches', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+    payload: JSON.stringify({ event_type: 'sheet' }),
+    muteHttpExceptions: true,
+  });
+  return res.getResponseCode();
+}
+
+// いちばん新しい「調整くんっ！（データ）」（ゴミ箱のものは除く）
+function newestBook_() {
+  const files = DriveApp.getFilesByName(SETUP.title + '（データ）');
+  let newest = null;
+  while (files.hasNext()) {
+    const f = files.next();
+    if (f.isTrashed()) continue;
+    if (!newest || f.getDateCreated() > newest.getDateCreated()) newest = f;
+  }
+  if (!newest) throw new Error('「' + SETUP.title + '（データ）」が見つかりません。setup をもう一度実行してください。');
+  return SpreadsheetApp.openById(newest.getId());
+}
+
 // フォームの質問（回答シートの列は A:タイムスタンプ、B〜D がこの順）
 const EVENT_Q = { id: '募集ID', kind: '種類', body: '内容' };
 const ANSWER_Q = { id: '募集ID', key: '名前キー', body: '回答' };

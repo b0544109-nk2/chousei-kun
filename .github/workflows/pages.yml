@@ -1,10 +1,13 @@
 # サイトの公開と、募集ごとの小さなページ（LINEなどのプレビュー用）の自動作成。
-# 5分ごとにシートを読み、変わっていたときだけ公開しなおす（GitHubの都合で実際は5〜15分おきになることがある）。
+# ふだんは、シートに募集が届いたときに Apps Script から repository_dispatch（sheet）で呼ばれる（1〜2分で反映）。
+# 5分ごとの schedule は取りこぼし用の保険。GitHubの都合で実際は数時間おきにしか動かないことがある。
 name: pages
 
 on:
   push:
     branches: [main]
+  repository_dispatch:
+    types: [sheet]
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
