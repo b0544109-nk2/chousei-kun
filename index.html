@@ -552,7 +552,10 @@ var S=DEMO?seed():{cur:EID,events:[],answers:[]};
 if(DEMO&&EID)S.cur=EID;
 function save(){}
 
-var tab=EID||DEMO?"res":"new", unstar={}, draft=null, confirmDate=null, sortMode="near", selDate=null;
+/* 配った回答用URL（e/<ID>/、または転送後の ?e=<ID>&a）で開いたら、回答タブから始める。
+   幹事が作った直後や ?e=<ID> で開いたときは結果タブ */
+var OPEN_ANS=!!PATH_ID||Q.has("a");
+var tab=EID&&OPEN_ANS?"ans":EID||DEMO?"res":"new", unstar={}, draft=null, confirmDate=null, sortMode="near", selDate=null;
 var loaded=DEMO, loadErr="", firstLoad=true;
 function cur(){return S.events.filter(function(e){return e.id===S.cur})[0]||(DEMO?S.events[0]:null)}
 function evById(id){return S.events.filter(function(e){return e.id===id})[0]}
@@ -690,6 +693,8 @@ function refresh(){
     if(ev&&firstLoad){firstLoad=false;
       var my=store(MYNAME),L=latest(ev.id),mine=my&&L[norm(my)];
       if(!isOwner(ev.id)&&!mine&&!ev.decided)tab="ans";
+      /* 回答タブで始まって、前にこの端末で答えた名前があれば、その回答を読みこんでおく */
+      if(tab==="ans"&&!draft&&mine)draft=newDraft(ev,mine.name);
     }
     render();
     if(ev)return loadForeign(membersOf(ev).concat(store(MYNAME)?[store(MYNAME)]:[])).then(function(ch){if(ch)render()});
