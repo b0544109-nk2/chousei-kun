@@ -785,7 +785,7 @@ function shareBox(ev){
     '<a class="btn line" href="https://line.me/R/share?text='+encodeURIComponent(shareText(ev))+'" target="_blank" rel="noopener">LINEで送る</a></div>'+
     (DEMO?'<p class="note">見本データなので、このURLは開けません。</p>':
       '<p class="'+(pageReady[ev.id]?'prev ok':'prev')+'" id="prevState">'+(pageReady[ev.id]?'✓ LINEなどのプレビューの準備ができました':
-        '⏳ URLはもう開けます。LINEなどに貼ったときのプレビュー（〆切つきタイトル）は準備中です。作ってから5〜15分ほどかかります')+'</p>')+
+        '⏳ URLはもう開けます。LINEなどに貼ったときのプレビュー（〆切つきタイトル）は準備中です。作ってから1〜2分ほどで準備されます（この表示が「✓」に変わったら送りどき）')+'</p>')+
     (isOwner(ev.id)&&!DEMO?'<details class="fold"><summary>幹事用のURL（自分だけで使う）</summary><p class="note">別のスマホやPCで「この日に決める」を押したいときは、このURLで開きます。みんなには配らないでください。</p>'+
       '<input type="text" readonly value="'+esc(BASE+"?e="+ev.id+"&kanji")+'" aria-label="幹事用のURL"></details>':'')+
     '</section>';
