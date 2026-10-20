@@ -83,6 +83,8 @@ mkdirSync('_site', { recursive: true });
 for (const f of ['index.html', '404.html', 'config.js', 'ogp.png', 'favicon.png', 'apple-touch-icon.png']) {
   if (existsSync(f)) cpSync(f, '_site/' + f);
 }
+// マダミスえらび（madamis/）はそのままコピー
+if (existsSync('madamis')) cpSync('madamis', '_site/madamis', { recursive: true });
 const manifest = {};
 for (const [id, j] of Object.entries(events)) {
   const html = pageFor(id, j);
@@ -91,7 +93,7 @@ for (const [id, j] of Object.entries(events)) {
   manifest[id] = createHash('sha1').update(html).digest('hex').slice(0, 12);
 }
 // サイト本体のファイルが変わったときも公開しなおすよう、本体の指紋も入れる
-manifest._site = createHash('sha1').update(tpl + readFileSync('404.html', 'utf8') + cfgText).digest('hex').slice(0, 12);
+manifest._site = createHash('sha1').update(tpl + readFileSync('404.html', 'utf8') + cfgText + (existsSync('madamis') ? readFileSync('madamis/index.html', 'utf8') + readFileSync('madamis/works.js', 'utf8') : '')).digest('hex').slice(0, 12);
 
 // ---- 幹事の予定（フリカレ）を暗号化して busy.json に ----
 // 募集を作る画面のカレンダーで「予定がある日」に色を付けるためだけに使う。
