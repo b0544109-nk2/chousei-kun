@@ -1,7 +1,23 @@
-/* setup.gs を実行すると、ここに入れる中身が実行ログに出ます。
-   sheetId が空のあいだは「まだシートにつながっていません」と表示されます（?demo で見本データ）。 */
+/* setup.gs の出力（2026-10-20）。シート「調整くんっ！（データ）」とフォーム2つの送信先 */
 window.SOROU_CONFIG = {
-  "sheetId": "",
+  "sheetId": "1hbycSyJf-hq7gLeHAXhIaSVKU768RpYmo0Hdy4S40mc",
   "base": "https://b0544109-nk2.github.io/chousei-kun/",
-  "forms": null
+  "forms": {
+    "event": {
+      "action": "https://docs.google.com/forms/d/e/1FAIpQLSfVNQSKRNaudE9OMWJOzwS9yDA_afyKs6wmnjREOAZjrobYBQ/formResponse",
+      "entries": {
+        "id": "entry.959374982",
+        "kind": "entry.941241079",
+        "body": "entry.938854188"
+      }
+    },
+    "answer": {
+      "action": "https://docs.google.com/forms/d/e/1FAIpQLSdddznvfQDySCFzc7cPD57eVF61G237sUSweSXrYDjsxoBKww/formResponse",
+      "entries": {
+        "id": "entry.386214129",
+        "key": "entry.1694977318",
+        "body": "entry.1114472756"
+      }
+    }
+  }
 };
