@@ -914,8 +914,10 @@ function newDraft(ev,name){
 }
 function setName(name){
   var ev=cur();name=String(name||"").trim();
-  if(!name){draft=null;render();return}
+  var prev=draft&&draft.ev===ev.id?draft:null;
+  if(!name){if(prev){prev.name="";prev.loaded=false}else draft=newDraft(ev,"");render();return}
   draft=newDraft(ev,name);
+  if(!draft.loaded&&prev){draft.rows=prev.rows;draft.target=prev.target}
   store(MYNAME,name);
   offerRef(ev);render();
   /* 別の募集の回答はまだ読んでいなければ読んでから、参照するか聞く */
@@ -943,7 +945,8 @@ function renderAns(){
     '<datalist id="memList">'+mem.map(function(n){return '<option value="'+esc(n)+'">'}).join("")+'</datalist>'+
     '<div class="members">'+mem.map(function(n){return '<button class="chipbtn'+(L[norm(n)]?' done':'')+'" data-pick="'+esc(n)+'" aria-pressed="'+(!!draft&&norm(draft.name)===norm(n))+'">'+esc(n)+'</button>'}).join("")+'</div>'+
     '<p class="note">初めての人は名前を入れてください。回答ずみの人は、上の名前を押すと前の回答を読みこんで直せます。</p></section>';
-  if(!draft||draft.ev!==ev.id)return h;
+  /* 名前を入れる前から候補日を出す（名前が空の下書き。送るときに名前を確認する） */
+  if(!draft||draft.ev!==ev.id)draft=newDraft(ev,"");
   if(draft.refAsk){
     var sg=draft.refAsk,ds=Object.keys(sg.map).sort();
     h+='<section class="refbox"><p class="q">'+esc(draft.name)+'さん、他の募集の回答が'+sg.src.length+'件あります。重なる日（'+ds.map(dl).join("・")+'）に反映しますか？</p><ul>'+
@@ -1137,6 +1140,12 @@ document.addEventListener("click",function(e){
     if(REASON_EX[ds.set]&&!r.c){var ri=document.getElementById("cm-"+ds.d);if(ri)ri.focus()}return}
   if(ds.cm){var r2=draft.rows[ds.cm];r2.open=!r2.open;render();if(r2.open){var i=document.getElementById("cm-"+ds.cm);if(i)i.focus()}return}
   if(b.id==="send"){
+    if(!String(draft.name||"").trim()){
+      var ni=document.getElementById("ansName");
+      var nv=ni&&ni.value.trim();
+      if(nv){draft.name=nv;store(MYNAME,nv)}   /* 押した記号はそのまま送る（setName だと前の回答で上書きされるため） */
+      else{toast("お名前を入れてください");if(ni){ni.focus();ni.scrollIntoView({block:"center"})}return}
+    }
     var a={};Object.keys(draft.rows).forEach(function(d){var r=draft.rows[d];a[d]={v:r.v};if(r.c)a[d].c=r.c;if(r.v==="machi"&&r.until)a[d].until=r.until});
     var before=Object.keys(latest(ev.id)).length;
     if(DEMO)S.answers.push({ev:ev.id,name:draft.name,ts:Date.now(),a:a});
