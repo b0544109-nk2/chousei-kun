@@ -425,6 +425,9 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .copybox{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .copybox:empty{display:none}
+  .copybox select{flex:1 1 12rem;min-width:0;border:1px solid rgba(139,123,255,.35);border-radius:14px;background:rgba(255,255,255,.85);padding:8px 12px;font-size:.9rem}
   .busynote i{display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,179,107,.35);position:relative;flex:none}
   .busynote i::after{content:"";position:absolute;top:1px;right:1px;width:5px;height:5px;border-radius:50%;background:#ff9d4d}
   .busytxt{font-size:.74rem;font-weight:700;color:#b5651d;background:rgba(255,179,107,.18);border-radius:10px;padding:2px 8px;min-width:0;overflow-wrap:anywhere}
@@ -791,6 +794,7 @@ function renderExtra(){
       '</ul><p class="note">この端末で答えた募集だけが出ます。ほかの人には見えません。</p></section>';
   }
   box.innerHTML=h;box.hidden=!h;
+  if(tab==="new")fillCopyBox();
 }
 function schedule(){clearTimeout(pollT);pollT=setTimeout(function(){if(document.hidden){schedule();return}refresh()},30000+Math.random()*8000)}
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&Date.now()-lastLoad>10000)refresh()});
@@ -1149,7 +1153,7 @@ function renderNew(){
   var t=new Date(),h='<section class="panel"><div class="sec-h" style="margin:0">新しい募集</div>'+
     '<label class="f" for="nTitle">タイトル<input type="text" id="nTitle" placeholder="例）新年会の日決め"></label>'+
     '<label class="f" for="nMemo">詳細（任意）<textarea id="nMemo" placeholder="例）お店は日が決まってから予約します&#10;https://… のURLは押せるリンクになります"></textarea></label>'+
-    '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><p class="note busynote" id="busyNote"'+(BUSY?'':' hidden')+'><i></i>の日はフリカレに予定がある日です（この端末にだけ表示）</p><div class="cals" id="cals">';
+    '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><div class="copybox" id="copyBox"></div><p class="note busynote" id="busyNote"'+(BUSY?'':' hidden')+'><i></i>の日はフリカレに予定がある日です（この端末にだけ表示）</p><div class="cals" id="cals">';
   for(var i=0;i<calMonths;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);h+=calHtml(m)}
   h+='</div>'+farPicker()+'<label class="f" for="nTime">はじめに入る時刻<input type="text" id="nTime" list="timeList" value="19:00〜"></label>'+
     '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
@@ -1170,6 +1174,44 @@ function calHtml(m){
     var bz=BUSY&&BUSY[s];
     h+='<button data-day="'+s+'" class="'+dowClass(s)+(nd.dates[s]?' on':'')+(bz?' busy':'')+'"'+(bz?' title="'+esc(bz)+'"':'')+(s<td?' disabled':'')+'>'+d+'</button>'}
   return h+'</div></div>';
+}
+/* ---- 前の募集の候補日（時刻つき）をコピー ----
+   幹事の端末ではシートの全募集から、それ以外はこの端末で作った募集から選べる。いちばん上が前回。
+   コピーは「足す」。もう過ぎた日はとばす */
+function copySources(){
+  var m={},out=[];
+  (jget(MINE)||[]).slice().reverse().forEach(function(x){if(!m[x.id]){m[x.id]=1;out.push({id:x.id,title:x.title,dates:x.dates||null,at:x.id})}});
+  if(isBoss()&&allEvents)allEvents.slice().sort(function(a,b){return (b.deadline||"")<(a.deadline||"")?-1:1}).forEach(function(e){
+    if(m[e.id]){out.forEach(function(o){if(o.id===e.id&&!o.dates)o.dates=e.dates});return}
+    m[e.id]=1;out.push({id:e.id,title:e.title,dates:e.dates});
+  });
+  return out.slice(0,40);
+}
+function fillCopyBox(){
+  var box=document.getElementById("copyBox");if(!box||DEMO)return;
+  var src=copySources();
+  if(!src.length){box.innerHTML="";return}
+  var keep=(document.getElementById("copyFrom")||{}).value||"";
+  box.innerHTML='<select id="copyFrom" aria-label="前の募集の候補日をコピー">'+
+    src.map(function(x,i){return '<option value="'+esc(x.id)+'"'+(x.id===keep?' selected':'')+'>'+(i===0?'前回：':'')+esc(x.title)+'</option>'}).join("")+
+    '</select><button class="btn sm" id="copyDates">この候補日をコピー</button>'+
+    '<button class="btn sub sm" id="clearDates">選んだ日を全部消す</button>';
+}
+function copyDatesFrom(id){
+  var x=copySources().filter(function(s){return s.id===id})[0];if(!x)return;
+  var go=function(dates){
+    var td=today(),add=0,past=0;
+    dates.forEach(function(k){var d=kd(k),t=kt(k);
+      if(d<td){past++;return}
+      var arr=nd.dates[d]||(nd.dates[d]=[]);
+      if(arr.indexOf(t)<0){arr.push(t);add++}
+    });
+    refreshPicked();fillCopyBox();
+    toast(add?"候補日を"+add+"件コピーしました"+(past?"（過ぎた日"+past+"件はとばしました）":""):past?"どれももう過ぎた日でした":"同じ候補日はもう選んであります");
+  };
+  if(x.dates)return go(x.dates);
+  gviz("募集","select * where B = '"+safeId(id)+"'").then(function(r){var e=parseEvents(r)[id];if(e)go(e.dates);else toast("その募集の候補日を読めませんでした")})
+    .catch(function(){toast("読みこめませんでした。電波のよいところでもう一度")});
 }
 function refreshPicked(){
   var el=document.getElementById("picked");if(!el)return;
@@ -1212,7 +1254,7 @@ function render(){
   else{document.title=pageTitle(ev);body=tab==="res"?renderRes():renderAns();if(tab==="res")checkPage(ev)}
   var v=document.getElementById("view");
   v.innerHTML='<div style="display:flex;flex-direction:column;gap:14px">'+body+'</div>';
-  if(tab==="new")refreshPicked();
+  if(tab==="new"){refreshPicked();fillCopyBox()}
   renderExtra();
 }
 var toastT;
@@ -1244,6 +1286,8 @@ document.addEventListener("click",function(e){
     try{navigator.clipboard.writeText(txt).then(ok,function(){toast("コピーできませんでした")})}catch(err){toast("コピーできませんでした")}
     return;
   }
+  if(b.id==="copyDates"){var sel=document.getElementById("copyFrom");if(sel)copyDatesFrom(sel.value);return}
+  if(b.id==="clearDates"){nd.dates={};refreshPicked();fillCopyBox();toast("選んだ候補日を消しました");return}
   if(ds.tall){var t0=defTime();Object.keys(nd.dates).forEach(function(d){nd.dates[d]=[t0]});refreshPicked();return}
   if(ds.tadd){nd.dates[ds.tadd].push("");refreshPicked();var ni=document.getElementById("t-"+ds.tadd+"-"+(nd.dates[ds.tadd].length-1));if(ni)ni.focus();return}
   if(ds.tdel){var p=ds.tdel.split("|"),arr=nd.dates[p[0]];arr.splice(+p[1],1);if(!arr.length)delete nd.dates[p[0]];refreshPicked();return}
@@ -1299,7 +1343,7 @@ document.addEventListener("click",function(e){
   nd={dates:{},drag:null};tab="res";
   if(!DEMO){
     sendEvent(ev,"作成");
-    var mine=jget(MINE)||[];mine.push({id:id,title:ev.title,deadline:ev.deadline});jset(MINE,mine.slice(-50));
+    var mine=jget(MINE)||[];mine.push({id:id,title:ev.title,deadline:ev.deadline,dates:ev.dates});jset(MINE,mine.slice(-50));
     EID=id;loaded=true;loadErr="";firstLoad=false;
     try{history.replaceState(null,"",BASE+"?e="+id)}catch(err){}
     schedule();
