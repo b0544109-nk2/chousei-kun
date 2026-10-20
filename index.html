@@ -895,15 +895,14 @@ function suggestions(ev,name){
     ev.dates.forEach(function(d){
       o.dates.forEach(function(od){
         if(kd(od)!==kd(d))return;
-        var v=a.a[od]&&a.a[od].v;if(!v||v==="-")return;
-        /* 募集の名前は出さない（入る文はこの募集のほかの人にも見える） */
+        var c0=a.a[od],v=c0&&c0.v;if(!v||v==="-")return;
+        /* 別の募集でその日に付けた ○△× をそのまま使う（ひとこと・いつ分かるも）。
+           ただし、その別の募集がこの日に決まっていて本人が○△なら、もう予定が入っているので ×。
+           募集の名前は出さない（入る文はこの募集のほかの人にも見える） */
         var s=null,tt=kt(od)?"（"+kt(od)+"）":"";
-        if(o.decided===od&&YES[v])s={v:"x",c:"別の予定"+tt+"がこの日に確定"};
+        if(o.decided===od&&YES[v])s={v:"x",c:"別の予定"+tt+"がこの日に確定",note:"別の予定がこの日に決まったので ×"};
         else if(o.decided&&kd(o.decided)===kd(d))return;
-        else if(o.decided)s=v==="x"?{v:"x",c:"別の予定あり"}:null;
-        else if(YES[v])s={v:"machi",c:"別の予定"+tt+"と並行調整中",until:o.deadline};
-        else if(v==="x")s={v:"x",c:"別の予定あり"};
-        if(!s)return;
+        else s={v:v,c:c0.c||"",until:v==="machi"?(c0.until||""):"",note:"別の募集で付けた "+SYM[v].g+SYM[v].sub+" と同じ"};
         hit=true;s.ref=1;
         if(!out[d]||RANK[s.v]>RANK[out[d].v])out[d]=s;
       });
@@ -940,7 +939,7 @@ function offerRef(ev){
 }
 function applyRef(sg){
   Object.keys(sg.map).forEach(function(d){var s=sg.map[d],r=draft.rows[d];
-    r.v=s.v;r.c=s.c;r.until=s.until||"";r.ref=s.ref;r.open=true});
+    r.v=s.v;r.c=s.c;r.until=s.until||"";r.ref=s.ref;r.refNote=s.note||"";r.open=!!s.c});
   draft.refAsk=null;draft.refDone=true;
 }
 function renderAns(){
@@ -954,7 +953,7 @@ function renderAns(){
   if(!draft||draft.ev!==ev.id)draft=newDraft(ev,"");
   if(draft.refAsk){
     var sg=draft.refAsk,ds=Object.keys(sg.map).sort();
-    h+='<section class="refbox"><p class="q">'+esc(draft.name)+'さん、他の募集の回答が'+sg.src.length+'件あります。重なる日（'+ds.map(dl).join("・")+'）に反映しますか？</p><ul>'+
+    h+='<section class="refbox"><p class="q">'+esc(draft.name)+'さん、他の募集で同じ日に答えた ○△× があります（'+sg.src.length+'件）。重なる日（'+ds.map(dl).join("・")+'）に同じ内容を入れますか？</p><ul>'+
       sg.src.map(function(o,i){return '<li>別の募集'+(sg.src.length>1?(i+1):"")+'（'+(o.decided?dl(o.decided)+"に決定":"調整中・〆"+md(o.deadline))+'）</li>'}).join("")+'</ul>'+
       '<div class="row"><button class="btn" data-ref="yes">参照する</button><button class="btn sub sm" data-ref="no">今回はしない</button><button class="btn sub sm" data-ref="auto">今後も自動で参照</button></div>'+
       '<p class="note">反映した回答は自分で直せて、送るまで何も決まりません。別の募集の名前や中身は、ここにもほかの人にも出ません。</p></section>';
@@ -974,7 +973,7 @@ function renderAns(){
       var x='<div class="arow'+(r.ref?' ref':'')+'"><div class="arow-top">'+dlHtml(d)+'<div class="symrow">'+ORDER.map(function(v){return symBtn(v,"set",d,r.v===v)}).join("")+'</div>'+
         '<button class="cbtn'+(r.c?' has':'')+'" data-cm="'+d+'" aria-label="'+dl(d)+'のひとこと">💬</button></div>'+
         '<div class="others"><span class="tmark sm t-'+tr.tier+'">'+t.mark+' '+t.name+'</span>'+others+'</div>';
-      if(r.ref)x+='<div class="reftag">参照：'+esc(r.c)+'</div>';
+      if(r.ref)x+='<div class="reftag">参照：'+esc(r.refNote||"別の募集の回答から")+'</div>';
       var tri=r.v==="ka"||r.v==="machi"||r.v==="kiken";
       if(r.open||tri){
         x+='<div class="extra">'+'<input type="text" id="cm-'+d+'" data-cmin="'+d+'" placeholder="'+(tri?"△の理由（例："+REASON_EX[r.v]+"）":"ひとこと（任意）")+'" value="'+esc(r.c)+'"'+(tri?' class="reason"':'')+'>'+
