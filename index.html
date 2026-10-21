@@ -425,6 +425,14 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .guide{background:rgba(255,255,255,.55);border:1px solid var(--glass-edge);border-radius:18px;padding:8px 12px}
+  .guide summary{cursor:pointer;font-weight:800;font-size:.84rem}
+  .guide ul{list-style:none;margin:8px 0 2px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,14rem),1fr));gap:8px 12px}
+  .guide li{display:flex;align-items:center;gap:10px;min-width:0}
+  .guide li .sym{font-size:.85rem}
+  .guide li div{display:flex;flex-direction:column;min-width:0;line-height:1.35}
+  .guide li b{font-size:.84rem}
+  .guide li span{font-size:.72rem;color:var(--muted);font-weight:700}
   .drow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.7)}
   .drow.held{background:rgba(143,208,255,.22);outline:1px solid rgba(47,120,183,.25)}
   .drow.confirm{justify-content:flex-start;font-weight:700;font-size:.85rem}
@@ -1168,7 +1176,7 @@ function renderAns(){
   var tierBy={};analyze(ev,draft.name).forEach(function(r){tierBy[r.d]=r});
   if(draft.refAuto)h+='<p class="note">他の募集の回答を自動で反映しました（点線の日）。<button class="btn sub sm" data-ref="stopauto">自動参照をやめる</button></p>';
   else if(draft.loaded&&!draft.refAsk)h+='<p class="note">前の回答を読みこみました。直して送れます。</p>';
-  h+='<section class="panel"><div class="bulk"><div class="bulk-h">まとめて入れる</div>'+
+  h+='<section class="panel">'+symGuide()+'<div class="bulk"><div class="bulk-h">まとめて入れる</div>'+
     '<div class="seg" role="group" aria-label="まとめて入れる日">'+[["all","ぜんぶ"],["we","土日・祝"],["wd","平日"]].map(function(x){return '<button data-tgt="'+x[0]+'" aria-pressed="'+(draft.target===x[0])+'">'+x[1]+'</button>'}).join("")+'</div>'+
     '<div class="symrow">'+ORDER.map(function(v){return symBtn(v,"bulk","",true)}).join("")+'</div></div>'+
     '<p class="note">各候補の下に、ほかの人の回答と、いまの状態が出ています。</p>'+
@@ -1189,6 +1197,21 @@ function renderAns(){
     '</section><div class="sendbar"><button class="btn go" id="send">この内容で回答する</button></div>';
   return h;
 }
+/* 回答画面の上に、記号ごとの意味（スマホでは記号に指をのせても説明が出ないので、文字で並べる） */
+var SYM_GUIDE={
+  o:["行ける","この日は大丈夫"],
+  ka:["避けたいけど調整できる","頼まれたら予定をずらせる"],
+  machi:["並行調整中","ほかの予定と取り合い中。いつ分かるかも入れてね"],
+  kiken:["ダメになりそう","今のところ厳しい。行けたらラッキー"],
+  x:["無理","この日は行けない"],
+  "-":["未入力","まだ決めていない"]
+};
+function symGuide(){
+  var open=store("sorouhi.guide")!=="close";
+  return '<details class="guide"'+(open?' open':'')+' id="symGuide"><summary>記号の意味</summary><ul>'+
+    ORDER.map(function(v){var g=SYM_GUIDE[v];return '<li>'+symHtml(v)+'<div><b>'+g[0]+'</b><span>'+g[1]+'</span></div></li>'}).join("")+'</ul></details>';
+}
+document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="symGuide")store("sorouhi.guide",e.target.open?"open":"close")},true);
 function symBtn(v,act,d,on){
   var m=SYM[v];
   return '<button class="symbtn s-'+(v==="-"?"none":v)+'" data-'+act+'="'+v+'"'+(d?' data-d="'+d+'"':'')+' aria-pressed="'+on+'" aria-label="'+m.label+'" title="'+m.label+'">'+m.g+(m.sub?'<i>'+m.sub+'</i>':'')+'</button>';
