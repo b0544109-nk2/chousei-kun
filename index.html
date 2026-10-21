@@ -425,6 +425,14 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .drow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.7)}
+  .drow.held{background:rgba(143,208,255,.22);outline:1px solid rgba(47,120,183,.25)}
+  .drow.confirm{justify-content:flex-start;font-weight:700;font-size:.85rem}
+  .dlab{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+  .dlab b{font-size:.92rem}
+  .holdtag2{font-size:.66rem;font-weight:800;color:#2f78b7}
+  .dacts{display:flex;gap:6px;flex:none}
+  .btn.hold{background:rgba(143,208,255,.45);border:none;color:#1e5b8f}
   .holdtag{display:block;margin-top:3px;font-size:.6rem;font-weight:800;color:#2f78b7;white-space:nowrap}
   .holdrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
   .holdrow .note{flex:1 1 12rem}
@@ -642,7 +650,7 @@ function parseEvents(rows){
   rows.forEach(function(r){var id=safeId(r[1]),j=jparse(r[3]);
     if(!id||!j||!j.title||!Array.isArray(j.dates))return;
     m[id]={id:id,title:String(j.title),memo:String(j.memo||""),deadline:String(j.deadline||""),count:+j.count||null,
-      dates:j.dates.map(String),decided:j.decided||null,holding:Array.isArray(j.holding)?j.holding.map(String):[],members:[],n:j.n||""}});
+      dates:j.dates.map(String),decided:j.decided||null,holding:Array.isArray(j.holding)?j.holding.map(String):[],org:String(j.org||""),members:[],n:j.n||""}});
   return m;
 }
 /* 回答タブ：A時刻 B募集ID C名前キー D回答(JSON)。行の順番を新しさとして使う */
@@ -675,7 +683,7 @@ function flushAnswers(id){
       .then(function(){p.sent=true}).catch(function(){})})).then(function(){jset(pendKey(id),list)});
 }
 function sendEvent(ev,kind){
-  var snap={title:ev.title,memo:ev.memo,deadline:ev.deadline,count:ev.count,dates:ev.dates,decided:ev.decided,holding:ev.decided?[]:(ev.holding||[]),n:nonce()};
+  var snap={title:ev.title,memo:ev.memo,deadline:ev.deadline,count:ev.count,dates:ev.dates,decided:ev.decided,org:ev.org||"",holding:ev.decided?[]:(ev.holding||[]),n:nonce()};
   ev.n=snap.n;
   jset(pevKey(ev.id),{snap:snap,kind:kind,at:Date.now(),sent:false});
   return flushEvent(ev.id);
@@ -701,7 +709,12 @@ function mergePending(id,ev){
   return ev;
 }
 /* 幹事として「決める・調整中」を押せる端末：作った端末、幹事用URL、フリカレの鍵が入った端末（＝幹事本人の端末） */
-function isOwner(id){return DEMO||KANJI||isBoss()||(jget(MINE)||[]).some(function(m){return m.id===id})}
+function isOwner(id){
+  if(DEMO||KANJI||isBoss()||(jget(MINE)||[]).some(function(m){return m.id===id}))return true;
+  /* 幹事の名前：どの端末でも、その名前で回答した（＝名前を覚えている）端末なら幹事。身内用なので名前の一致だけで判定 */
+  var e=evById(id),my=store(MYNAME);
+  return !!(e&&e.org&&my&&norm(e.org)===norm(my));
+}
 
 /* 開いている募集と、その回答を読む */
 function loadMain(){
@@ -954,7 +967,7 @@ function evHead(ev,L){
   return '<section class="panel evhead"><div class="titlerow"><h2>'+esc(ev.title)+'</h2>'+
     '<span class="dlbadge'+(late?' late':'')+'"><small>回答〆切</small>'+md(ev.deadline)+'<small>('+wd(ev.deadline)+')</small>'+(late?'<small>過ぎています</small>':'')+'</span></div>'+
     (ev.memo?'<p class="memo">'+linkify(ev.memo)+'</p>':'')+
-    '<div class="meta"><span class="chip">候補 '+ev.dates.length+'つ</span><span class="chip'+(ev.count&&n>=ev.count?' done':'')+'">回答 '+n+(ev.count?' / '+ev.count:'')+'人'+(ev.count&&n>=ev.count?' ✓ そろった':'')+'</span></div>'+
+    '<div class="meta">'+(ev.org?'<span class="chip">👑 幹事：'+esc(ev.org)+'</span>':'')+'<span class="chip">候補 '+ev.dates.length+'つ</span><span class="chip'+(ev.count&&n>=ev.count?' done':'')+'">回答 '+n+(ev.count?' / '+ev.count:'')+'人'+(ev.count&&n>=ev.count?' ✓ そろった':'')+'</span></div>'+
     (ev.count?'<div class="prog" aria-hidden="true"><span style="width:'+Math.min(100,Math.round(n/ev.count*100))+'%"></span></div>':'')+
     '<div class="ptitle"><small>LINEなどに貼ったときのタイトル</small>'+esc(pageTitle(ev))+'</div></section>';
 }
@@ -1034,14 +1047,16 @@ function renderRes(){
 function isHold(ev,d){return !ev.decided&&(ev.holding||[]).indexOf(d)>=0}
 function decideBox(ev,rows){
   if(ev.decided||!isOwner(ev.id))return "";
+  /* 全員そろう順の上位3つ＋調整中にしている日（上位に入っていなくても出す） */
   var c=rows.filter(function(r){return r.tier!=="out"&&r.tier!=="empty"}).slice(0,3);
+  rows.forEach(function(r){if(isHold(ev,r.d)&&c.indexOf(r)<0)c.push(r)});
   if(!c.length)return "";
-  var hl=(ev.holding||[]).filter(function(d){return ev.dates.indexOf(d)>=0}).sort();
-  return '<div class="decide"><div class="decide-h">この日に決める</div>'+
-    (hl.length?'<div class="holdlist">⏸ 調整中：'+hl.map(function(d){return '<button class="chipbtn" data-hold="'+d+'" title="押すと調整中を外します">'+esc(dl(d))+' ✕</button>'}).join("")+'</div>':'')+
-    c.map(function(r){var t=tierObj(r);
-    if(confirmDate===r.d)return '<div class="confirm">'+esc(dl(r.d))+' に決めますか？<button class="btn sm go2" data-decide="'+r.d+'">決める</button><button class="btn sub sm" data-cancel="1">やめる</button></div>';
-    return '<button class="btn sm dbtn" data-ask="'+r.d+'"><span>'+esc(dl(r.d))+'</span><small class="tmark sm t-'+r.tier+'">'+t.mark+' '+t.name+'</small></button>'}).join("")+'</div>';
+  return '<div class="decide"><div class="decide-h">候補ごとに 決定 か 調整中 を選べます</div>'+c.map(function(r){var t=tierObj(r),hold=isHold(ev,r.d);
+    if(confirmDate===r.d)return '<div class="drow confirm">'+esc(dl(r.d))+' に決めますか？<button class="btn sm go2" data-decide="'+r.d+'">決める</button><button class="btn sub sm" data-cancel="1">やめる</button></div>';
+    return '<div class="drow'+(hold?' held':'')+'"><div class="dlab"><b>'+esc(dl(r.d))+'</b><small class="tmark sm t-'+r.tier+'">'+t.mark+' '+t.name+'</small>'+(hold?'<small class="holdtag2">⏸ 調整中</small>':'')+'</div>'+
+      '<div class="dacts"><button class="btn sm go2" data-ask="'+r.d+'">決定</button>'+
+      '<button class="btn sm '+(hold?'sub':'hold')+'" data-hold="'+r.d+'">'+(hold?'調整中を外す':'⏸ 調整中')+'</button></div></div>'}).join("")+
+    '<p class="note">調整中にした日は、ほかの募集でその日に○△の人が自動で △待 になります（いくつでも）</p></div>';
 }
 function card(ev,r){
   var t=tierObj(r),g=r.g,desc;
@@ -1216,6 +1231,8 @@ function farPicker(){
 function renderNew(){
   var t=new Date(),h='<section class="panel"><div class="sec-h" style="margin:0">新しい募集</div>'+
     '<label class="f" for="nTitle">タイトル<input type="text" id="nTitle" placeholder="例）新年会の日決め"></label>'+
+    '<label class="f" for="nOrg">幹事の名前<input type="text" id="nOrg" placeholder="例）nk2" value="'+esc(store(MYNAME)||"")+'"></label>'+
+    '<p class="note" style="margin-top:-6px">この名前で回答した端末なら、どの端末からでも「この日に決める」を押せます。回答するときもこの名前を使ってください。</p>'+
     '<label class="f" for="nMemo">詳細（任意）<textarea id="nMemo" placeholder="例）お店は日が決まってから予約します&#10;https://… のURLは押せるリンクになります"></textarea></label>'+
     '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><div class="copybox" id="copyBox"></div><p class="note busynote" id="busyNote"'+(BUSY?'':' hidden')+'><i></i>の日はフリカレに予定がある日です（この端末にだけ表示）</p><div class="cals" id="cals">';
   for(var i=0;i<calMonths;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);h+=calHtml(m)}
@@ -1407,10 +1424,14 @@ document.addEventListener("click",function(e){
   if(b.disabled)return;b.disabled=true;
   /* IDは英字で始まる10文字（シートで数字や日付に化けないように） */
   var id="s"+(Date.now().toString(36)+Math.random().toString(36).slice(2)).slice(-9);
-  var ev={id:id,title:title.slice(0,80),memo:document.getElementById("nMemo").value.trim().slice(0,2000),
+  var orgName=(document.getElementById("nOrg")||{value:""}).value.trim().slice(0,40);
+  if(orgName)store(MYNAME,orgName);
+  var ev={id:id,title:title.slice(0,80),memo:document.getElementById("nMemo").value.trim().slice(0,2000),org:orgName,
     deadline:dlv,dates:keys.sort().slice(0,60),members:[],decided:null,count:Math.min(200,Math.max(0,parseInt(document.getElementById("nCount").value,10)||0))||null};
   S.events=S.events.filter(function(e){return e.id!==id});S.events.unshift(ev);S.cur=id;
-  nd={dates:{},drag:null};tab="res";
+  nd={dates:{},drag:null};
+  /* 幹事の名前があれば、そのまま回答タブで幹事の都合を入れてもらう（送ると結果タブ＝URLを配る画面へ） */
+  tab=orgName?"ans":"res";draft=orgName?newDraft(ev,orgName):null;
   if(!DEMO){
     sendEvent(ev,"作成");
     var mine=jget(MINE)||[];mine.push({id:id,title:ev.title,deadline:ev.deadline,dates:ev.dates});jset(MINE,mine.slice(-50));
@@ -1418,7 +1439,7 @@ document.addEventListener("click",function(e){
     try{history.replaceState(null,"",BASE+"?e="+id)}catch(err){}
     schedule();
   }
-  render();window.scrollTo({top:0});toast("募集をつくりました。URLを配りましょう");
+  render();window.scrollTo({top:0});toast(orgName?"募集をつくりました。続けて "+orgName+" さんの都合を入れてください":"募集をつくりました。URLを配りましょう");
 });
 document.addEventListener("input",function(e){
   var t=e.target;
