@@ -31,7 +31,6 @@
   /* Android の X は「Chrome のカスタムタブ」で開く。見た目も UA も Chrome と同じだが、
      開いたアプリが document.referrer に android-app://<アプリ> として入るので、それで見分ける */
   var ref=document.referrer||"",pkg=(ref.match(/^android-app:\/\/([\w.]+)/)||[])[1]||"";
-  try{if(pkg)sessionStorage.setItem("sorouhi.iabPkg",pkg);else pkg=sessionStorage.getItem("sorouhi.iabPkg")||""}catch(e){}
   var byPkg={"com.twitter.android":"X","jp.naver.line.android":"LINE","com.instagram.android":"Instagram","com.facebook.katana":"Facebook","com.discord":"Discord"};
   var app=/Twitter|TwitterAndroid/i.test(ua)?"X":/\bLine\//i.test(ua)?"LINE":/Instagram/i.test(ua)?"Instagram":/FBAN|FBAV/i.test(ua)?"Facebook":
     (pkg&&!/chrome|browser|firefox|opera|samsung|edge|quicksearchbox|googlequicksearch/i.test(pkg))?(byPkg[pkg]||"アプリ"):
@@ -39,21 +38,15 @@
   var customTab=!!pkg&&!/; wv\)/.test(ua);
   if(!app)return;
   try{if(sessionStorage.getItem("sorouhi.iabClosed"))return}catch(e){}
-  /* カスタムタブは Chrome と保存場所が同じ。一度「とじる」を押したら、その端末では二度と出さない */
-  if(customTab){try{if(localStorage.getItem("sorouhi.ctClosed"))return}catch(e){}}
+  /* カスタムタブ（Android の X など）は Chrome と保存場所が同じで困らない。
+     しかも「︙→Chromeで開く」は読み直さずに移るので、案内を出すと Chrome に移っても消えない。だから何も出さない */
+  if(customTab)return;
   var android=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua);
   var url=location.href.replace(/[?&]openExternalBrowser=1/,"");
   /* カスタムタブからは Chrome を名指しで開く（名指ししないと同じカスタムタブに戻ることがある） */
   var href=android?"intent://"+url.replace(/^https?:\/\//,"")+"#Intent;scheme=https;"+(customTab?"package=com.android.chrome;":"")+"end":ios?"x-safari-"+url:url;
   document.addEventListener("DOMContentLoaded",function(){
     var b=document.createElement("div");b.className="iab";b.setAttribute("role","note");
-    if(customTab){
-      b.className="iab slim";
-      b.innerHTML='<div class="iab-t"><span>'+app+'の中で開いています。名前や回答はChromeと同じなので、このままで大丈夫です。Chromeで開き直したいときは、右上の「︙」→「Chromeで開く」。</span></div><button class="linkbtn" type="button">とじる</button>';
-      b.querySelector("button").onclick=function(){b.remove();try{localStorage.setItem("sorouhi.ctClosed","1")}catch(e){}};
-      var w0=document.querySelector(".wrap");(w0||document.body).insertBefore(b,(w0||document.body).firstChild);
-      return;
-    }
     b.innerHTML='<div class="iab-t"><b>'+app+'の中のブラウザで開いています</b><span>名前や幹事の情報は、ふだんのブラウザ（Chrome・Safari）で開くと引き継がれます。</span></div>'+
       '<div class="iab-a"><a class="btn sm go2" href="'+href.replace(/"/g,"&quot;")+'">ブラウザで開く</a><button class="linkbtn" type="button">このまま使う</button></div>'+
       '<p class="iab-n">'+(customTab?'開かないときは、右上の「︙」から「Chromeで開く」を選んでください。':'開かないときは、右上の「︙」か共有ボタンから「ブラウザで開く」を選んでください。')+'</p>';
