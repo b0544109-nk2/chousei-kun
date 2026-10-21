@@ -464,6 +464,16 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .xs.hold{background:rgba(143,208,255,.35);color:#1e5b8f}
+  .holdsum{margin-top:4px;padding:8px 12px;border-radius:14px;background:rgba(143,208,255,.25);color:#1e5b8f;font-size:.84rem;font-weight:700;line-height:1.5}
+  .ovbox{margin-top:4px;font-size:.8rem}
+  .ovbox summary{cursor:pointer;font-weight:800;color:var(--muted)}
+  .ovbox ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+  .ovbox li{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .ovbox li b{font-weight:800}
+  .ov{font-size:.68rem;font-weight:800;border-radius:999px;padding:1px 8px}
+  .ov.x{background:#ffe0e6;color:#c0304f}
+  .ov.w{background:rgba(143,208,255,.35);color:#1e5b8f}
   .rchips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.72rem;font-weight:700;color:var(--muted)}
   .rchip{background:#fff7ea;color:#8a4b12;font-size:.74rem;padding:3px 10px;max-width:100%;overflow-wrap:anywhere;text-align:left}
   .iab{display:flex;flex-direction:column;gap:8px;background:rgba(43,37,64,.9);color:#fff;border-radius:18px;padding:12px 14px;box-shadow:var(--shadow)}
@@ -876,6 +886,7 @@ function renderExtra(){
     var open=list.filter(function(e){return !e.decided}).length;
     h+='<details class="fold xbox"'+(tab==="new"?' open':'')+'><summary>📋 すべての募集（調整中 '+open+'・決定 '+(list.length-open)+'）<small>幹事の端末だけに表示</small></summary><ul class="xlist">'+
       list.map(function(e){return '<li'+(e.id===EID?' class="cur"':'')+'><a href="'+esc(BASE+"?e="+e.id)+'">'+esc(e.title)+'</a>'+evStatus(e)+
+        (!e.decided&&e.holding&&e.holding.length?'<span class="xs hold">⏸ 調整中 '+e.holding.slice().sort().map(function(d){return esc(md(d)+"("+wd(d)+")")}).join("・")+'</span>':'')+
         '<span class="xs">回答 '+e.answers+(e.count?'/'+e.count:'')+'人</span>'+(mine[e.id]?'':'<span class="xs other">ほかの端末で作成</span>')+'</li>'}).join("")+'</ul></details>';
   }else if(!isBoss()){
     var nm=myNameNow(),js=joinedFor(nm);
@@ -1078,7 +1089,7 @@ function renderRes(){
     var n=Object.keys(L).length;
     h+='<section class="summary"><div class="big">'+esc(big)+'</div><p>'+(ev.count&&n>=ev.count?"🎉 全員（"+ev.count+"人）の回答がそろいました！みんなに連絡しましょう。":ev.count?"いま "+n+" / "+ev.count+"人が回答しています。あと"+(ev.count-n)+"人です。":n?"いま "+n+"人が回答しています。回答が増えると結果が変わります。":"URLを配って、回答を集めましょう。")+'</p>'+
       (ev.count&&n>=ev.count?'<div class="row"><button class="btn sm" id="doneCopy">結果を知らせる文をコピー</button></div>':'')+
-      decideBox(ev,rows)+'</section>';
+      holdInfo(ev)+overlapInfo(ev,rows)+decideBox(ev,rows)+'</section>';
     h+=shareBox(ev);
   }
   /* 出欠表：行＝候補日、列＝人。行を押すと下にその日のくわしい内容 */
@@ -1104,6 +1115,24 @@ function renderRes(){
 }
 /* 幹事用：まとめのすぐ下に「この日に決める」（全員そろう順の上位3つ）。出欠表の下まで行かなくても決められる */
 function isHold(ev,d){return !ev.decided&&(ev.holding||[]).indexOf(d)>=0}
+/* 幹事が調整中にしている日（回答者にも見せる） */
+function holdInfo(ev){
+  var hl=(ev.holding||[]).filter(function(d){return ev.dates.indexOf(d)>=0}).sort();
+  if(ev.decided||!hl.length)return "";
+  return '<div class="holdsum">⏸ 幹事がいま <b>'+hl.map(function(d){return esc(dl(d))}).join("</b> と <b>")+'</b> で調整中です</div>';
+}
+/* ほかの募集と重なって、自動で × や △待 になっている人（誰にでも見せる。募集の名前は出さない） */
+function overlapInfo(ev,rows){
+  var L=latest(ev.id),mem=membersOf(ev),items=[];
+  ev.dates.slice().sort().forEach(function(d){
+    var conf=[],hold=[];
+    mem.forEach(function(n){var c=cellOf(ev,L,n,d);if(!c)return;if(c.conf)conf.push(n);else if(c.hold)hold.push(n)});
+    if(conf.length)items.push('<li><b>'+esc(dl(d))+'</b>'+conf.map(esc).join("・")+' <span class="ov x">別の予定が決定 → ×</span></li>');
+    if(hold.length)items.push('<li><b>'+esc(dl(d))+'</b>'+hold.map(esc).join("・")+' <span class="ov w">別の予定と調整中 → △待</span></li>');
+  });
+  if(!items.length)return "";
+  return '<details class="ovbox"'+(items.length<=3?' open':'')+'><summary>ほかの予定と重なっている人（'+items.length+'）</summary><ul>'+items.join("")+'</ul></details>';
+}
 function decideBox(ev,rows){
   if(ev.decided||!isOwner(ev.id))return "";
   /* 全員そろう順の上位3つ＋調整中にしている日（上位に入っていなくても出す） */
