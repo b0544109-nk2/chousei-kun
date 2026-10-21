@@ -39,12 +39,21 @@
   var customTab=!!pkg&&!/; wv\)/.test(ua);
   if(!app)return;
   try{if(sessionStorage.getItem("sorouhi.iabClosed"))return}catch(e){}
+  /* カスタムタブは Chrome と保存場所が同じ。一度「とじる」を押したら、その端末では二度と出さない */
+  if(customTab){try{if(localStorage.getItem("sorouhi.ctClosed"))return}catch(e){}}
   var android=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua);
   var url=location.href.replace(/[?&]openExternalBrowser=1/,"");
   /* カスタムタブからは Chrome を名指しで開く（名指ししないと同じカスタムタブに戻ることがある） */
   var href=android?"intent://"+url.replace(/^https?:\/\//,"")+"#Intent;scheme=https;"+(customTab?"package=com.android.chrome;":"")+"end":ios?"x-safari-"+url:url;
   document.addEventListener("DOMContentLoaded",function(){
     var b=document.createElement("div");b.className="iab";b.setAttribute("role","note");
+    if(customTab){
+      b.className="iab slim";
+      b.innerHTML='<div class="iab-t"><span>'+app+'の中で開いています。名前や回答はChromeと同じなので、このままで大丈夫です。Chromeで開き直したいときは、右上の「︙」→「Chromeで開く」。</span></div><button class="linkbtn" type="button">とじる</button>';
+      b.querySelector("button").onclick=function(){b.remove();try{localStorage.setItem("sorouhi.ctClosed","1")}catch(e){}};
+      var w0=document.querySelector(".wrap");(w0||document.body).insertBefore(b,(w0||document.body).firstChild);
+      return;
+    }
     b.innerHTML='<div class="iab-t"><b>'+app+'の中のブラウザで開いています</b><span>名前や幹事の情報は、ふだんのブラウザ（Chrome・Safari）で開くと引き継がれます。</span></div>'+
       '<div class="iab-a"><a class="btn sm go2" href="'+href.replace(/"/g,"&quot;")+'">ブラウザで開く</a><button class="linkbtn" type="button">このまま使う</button></div>'+
       '<p class="iab-n">'+(customTab?'開かないときは、右上の「︙」から「Chromeで開く」を選んでください。':'開かないときは、右上の「︙」か共有ボタンから「ブラウザで開く」を選んでください。')+'</p>';
@@ -468,6 +477,8 @@
   .iab-a{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .iab .linkbtn{color:rgba(255,255,255,.75)}
   .iab-n{margin:0;font-size:.72rem;color:rgba(255,255,255,.7)}
+  .iab.slim{flex-direction:row;align-items:center;gap:10px;padding:8px 12px;background:rgba(43,37,64,.78)}
+  .iab.slim .iab-t{font-size:.74rem}
   .guide{background:rgba(255,255,255,.55);border:1px solid var(--glass-edge);border-radius:18px;padding:8px 12px}
   .guide summary{cursor:pointer;font-weight:800;font-size:.84rem}
   .guide ul{list-style:none;margin:8px 0 2px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,14rem),1fr));gap:8px 12px}
