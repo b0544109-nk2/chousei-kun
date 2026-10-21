@@ -16,6 +16,35 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="config.js"></script>
+<script>
+/* ---- アプリの中のブラウザ（X・LINE・Instagram など）で開かれたとき ----
+   アプリの中のブラウザは、ふだんのブラウザと保存場所が別なので、名前・幹事・フリカレの鍵が引き継がれない。
+   ・LINE：URLに openExternalBrowser=1 を付けると外のブラウザで開く（LINE公式の仕組み）ので自動で付け直す
+   ・ほか（X など）：自動では抜けられないので、上に案内と「ブラウザで開く」ボタンを出す
+     Android は intent:// で既定のブラウザ、iPhone は x-safari-https:// で Safari（iOS 17 以降）を開く */
+(function(){
+  var ua=navigator.userAgent||"";
+  if(/\bLine\//i.test(ua)){
+    var u=new URL(location.href);
+    if(u.searchParams.get("openExternalBrowser")!=="1"){u.searchParams.set("openExternalBrowser","1");location.replace(u.toString());return}
+  }
+  var app=/Twitter|TwitterAndroid/i.test(ua)?"X":/\bLine\//i.test(ua)?"LINE":/Instagram/i.test(ua)?"Instagram":/FBAN|FBAV/i.test(ua)?"Facebook":
+    (/Android/i.test(ua)&&/; wv\)/.test(ua))?"アプリ":"";
+  if(!app)return;
+  try{if(sessionStorage.getItem("sorouhi.iabClosed"))return}catch(e){}
+  var android=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua);
+  var url=location.href.replace(/[?&]openExternalBrowser=1/,"");
+  var href=android?"intent://"+url.replace(/^https?:\/\//,"")+"#Intent;scheme=https;end":ios?"x-safari-"+url:url;
+  document.addEventListener("DOMContentLoaded",function(){
+    var b=document.createElement("div");b.className="iab";b.setAttribute("role","note");
+    b.innerHTML='<div class="iab-t"><b>'+app+'の中のブラウザで開いています</b><span>名前や幹事の情報は、ふだんのブラウザ（Chrome・Safari）で開くと引き継がれます。</span></div>'+
+      '<div class="iab-a"><a class="btn sm go2" href="'+href.replace(/"/g,"&quot;")+'">ブラウザで開く</a><button class="linkbtn" type="button">このまま使う</button></div>'+
+      '<p class="iab-n">開かないときは、右上の「︙」か共有ボタンから「ブラウザで開く」を選んでください。</p>';
+    b.querySelector("button").onclick=function(){b.remove();try{sessionStorage.setItem("sorouhi.iabClosed","1")}catch(e){}};
+    var w=document.querySelector(".wrap");(w||document.body).insertBefore(b,(w||document.body).firstChild);
+  });
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -425,6 +454,12 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .iab{display:flex;flex-direction:column;gap:8px;background:rgba(43,37,64,.9);color:#fff;border-radius:18px;padding:12px 14px;box-shadow:var(--shadow)}
+  .iab-t{display:flex;flex-direction:column;gap:2px;font-size:.82rem;line-height:1.5}
+  .iab-t b{font-size:.9rem}
+  .iab-a{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .iab .linkbtn{color:rgba(255,255,255,.75)}
+  .iab-n{margin:0;font-size:.72rem;color:rgba(255,255,255,.7)}
   .guide{background:rgba(255,255,255,.55);border:1px solid var(--glass-edge);border-radius:18px;padding:8px 12px}
   .guide summary{cursor:pointer;font-weight:800;font-size:.84rem}
   .guide ul{list-style:none;margin:8px 0 2px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,14rem),1fr));gap:8px 12px}
