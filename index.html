@@ -1089,7 +1089,7 @@ function renderRes(){
     var n=Object.keys(L).length;
     h+='<section class="summary"><div class="big">'+esc(big)+'</div><p>'+(ev.count&&n>=ev.count?"🎉 全員（"+ev.count+"人）の回答がそろいました！みんなに連絡しましょう。":ev.count?"いま "+n+" / "+ev.count+"人が回答しています。あと"+(ev.count-n)+"人です。":n?"いま "+n+"人が回答しています。回答が増えると結果が変わります。":"URLを配って、回答を集めましょう。")+'</p>'+
       (ev.count&&n>=ev.count?'<div class="row"><button class="btn sm" id="doneCopy">結果を知らせる文をコピー</button></div>':'')+
-      holdInfo(ev)+overlapInfo(ev,rows)+decideBox(ev,rows)+'</section>';
+      holdInfo(ev)+decideBox(ev,rows)+'</section>';
     h+=shareBox(ev);
   }
   /* 出欠表：行＝候補日、列＝人。行を押すと下にその日のくわしい内容 */
