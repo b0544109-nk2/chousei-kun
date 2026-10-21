@@ -425,6 +425,12 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .holdtag{display:block;margin-top:3px;font-size:.6rem;font-weight:800;color:#2f78b7;white-space:nowrap}
+  .holdrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .holdrow .note{flex:1 1 12rem}
+  .holdlist{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.78rem;font-weight:800;color:#2f78b7}
+  .holdlist .chipbtn{background:rgba(143,208,255,.35);color:var(--ink);font-size:.74rem;padding:3px 10px}
+  .chip.hold{background:rgba(143,208,255,.35);border:none}
   .done-text{margin:0;width:100%;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:.8rem;line-height:1.55;
     background:#f6f2fd;border:1px dashed rgba(139,123,255,.45);border-radius:14px;padding:10px 12px;max-height:9.5rem;overflow:auto}
   .btn.done-copy{width:100%;font-size:1rem;padding:13px}
@@ -636,7 +642,7 @@ function parseEvents(rows){
   rows.forEach(function(r){var id=safeId(r[1]),j=jparse(r[3]);
     if(!id||!j||!j.title||!Array.isArray(j.dates))return;
     m[id]={id:id,title:String(j.title),memo:String(j.memo||""),deadline:String(j.deadline||""),count:+j.count||null,
-      dates:j.dates.map(String),decided:j.decided||null,members:[],n:j.n||""}});
+      dates:j.dates.map(String),decided:j.decided||null,holding:Array.isArray(j.holding)?j.holding.map(String):[],members:[],n:j.n||""}});
   return m;
 }
 /* 回答タブ：A時刻 B募集ID C名前キー D回答(JSON)。行の順番を新しさとして使う */
@@ -669,7 +675,7 @@ function flushAnswers(id){
       .then(function(){p.sent=true}).catch(function(){})})).then(function(){jset(pendKey(id),list)});
 }
 function sendEvent(ev,kind){
-  var snap={title:ev.title,memo:ev.memo,deadline:ev.deadline,count:ev.count,dates:ev.dates,decided:ev.decided,n:nonce()};
+  var snap={title:ev.title,memo:ev.memo,deadline:ev.deadline,count:ev.count,dates:ev.dates,decided:ev.decided,holding:ev.decided?[]:(ev.holding||[]),n:nonce()};
   ev.n=snap.n;
   jset(pevKey(ev.id),{snap:snap,kind:kind,at:Date.now(),sent:false});
   return flushEvent(ev.id);
@@ -833,11 +839,34 @@ function conflictOf(ev,name,d){
   }
   return null;
 }
+/* 別の募集（まだ決まっていない）で、幹事が同じ日を「調整中」にしていて、その人がそこに○△で答えている */
+function holdOf(ev,name,d){
+  for(var i=0;i<S.events.length;i++){var o=S.events[i];
+    if(o.id===ev.id||o.decided||!o.holding||!o.holding.length)continue;
+    var a=latest(o.id)[norm(name)];if(!a)continue;
+    for(var j=0;j<o.holding.length;j++){var h=o.holding[j];
+      if(kd(h)!==kd(d))continue;
+      var c=a.a[h];if(c&&YES[c.v])return o;
+    }
+  }
+  return null;
+}
+/* 自動で変わったときの見え方（×・△待）と、その説明 */
+function effV(c){return c?(c.conf?"x":c.hold?"machi":c.v):"-"}
+function autoNote(c){
+  if(!c)return "";
+  var was="（元の回答は "+SYM[c.v].g+SYM[c.v].sub+"）";
+  if(c.conf)return "別の予定がこの日に決まったので自動で ×"+was;
+  if(c.hold)return "別の募集でこの日を調整中なので自動で △待"+was;
+  return "";
+}
 function cellOf(ev,L,name,d){
   var a=L[norm(name)];if(!a)return null;
   var c=a.a[d]||{v:"-"};
   var r={v:c.v||"-",c:c.c||"",until:c.until||"",conf:null,eff:c.v||"-"};
   if(r.v!=="x"&&r.v!=="-"){var o=conflictOf(ev,name,d);if(o){r.conf=o;r.eff="x"}}   /* 別の募集がこの日に決まった → 自動で ×（元の回答は残すので、決定を取り消せば戻る） */
+  /* 別の募集でこの日を調整中 → ○・△可の人は自動で △待（分かる日はその募集の〆切）。△危・× はそのまま */
+  if(!r.conf&&(r.v==="o"||r.v==="ka")){var oh=holdOf(ev,name,d);if(oh){r.hold=oh;r.eff="machi";if(!r.until)r.until=oh.deadline||""}}
   return r;
 }
 function analyze(ev,skip){
@@ -989,11 +1018,11 @@ function renderRes(){
     mem0.map(function(n){return '<th class="hn'+(us0[norm(n)]?' off':'')+'"><span>'+esc(n)+'</span></th>'}).join("")+'</tr></thead><tbody>'+
     list.map(function(r){var t=tierObj(r);
       return '<tr class="r-'+r.tier+(r.d===selDate?' sel':'')+(ev.decided===r.d?' dec':'')+'" data-row="'+r.d+'"><th class="hd"><button data-row="'+r.d+'">'+dlHtml(r.d)+'</button></th>'+
-        '<td class="ht"><span class="tmark t-'+r.tier+'">'+t.mark+'<small>'+t.name+'</small></span></td>'+
-        mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=c?(c.conf?"x":c.v):"-",m=SYM[v];
-          var tip=c?((c.conf?"別の予定がこの日に決まったので自動で ×（元の回答は "+SYM[c.v].g+SYM[c.v].sub+"）":"")+(c.c?(c.conf?"／":"")+c.c:"")):"未回答";
-          return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf))?' has-c':'')+'" tabindex="0" role="button" data-tipn="'+esc(n)+'" data-tipv="'+v+'" data-tipc="'+esc(tip)+'" data-tipu="'+esc(v==="machi"&&c&&c.until?c.until:"")+'" data-tipd="'+esc(r.d)+'">'+
-            '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':'')+'</span>'+untilTag(c,v)+'</td>'}).join("")+'</tr>'}).join("")+
+        '<td class="ht"><span class="tmark t-'+r.tier+'">'+t.mark+'<small>'+t.name+'</small></span>'+(isHold(ev,r.d)?'<span class="holdtag">⏸ 調整中</span>':'')+'</td>'+
+        mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=effV(c),m=SYM[v];
+          var tip=c?(autoNote(c)+(c.c?(autoNote(c)?"／":"")+c.c:"")):"未回答";
+          return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf||c.hold))?' has-c':'')+'" tabindex="0" role="button" data-tipn="'+esc(n)+'" data-tipv="'+v+'" data-tipc="'+esc(tip)+'" data-tipu="'+esc(v==="machi"&&c&&c.until?c.until:"")+'" data-tipd="'+esc(r.d)+'">'+
+            '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':c&&c.hold?'<em>⏸</em>':'')+'</span>'+untilTag(c,v)+'</td>'}).join("")+'</tr>'}).join("")+
     '</tbody></table></div><p class="note">右上の点はひとことあり、⚠× は別の募集がその日に決まったので自動で × にした人です。✕ の行は来られない人がいる日です。</p>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
@@ -1001,11 +1030,15 @@ function renderRes(){
   return h;
 }
 /* 幹事用：まとめのすぐ下に「この日に決める」（全員そろう順の上位3つ）。出欠表の下まで行かなくても決められる */
+function isHold(ev,d){return !ev.decided&&(ev.holding||[]).indexOf(d)>=0}
 function decideBox(ev,rows){
   if(ev.decided||!isOwner(ev.id))return "";
   var c=rows.filter(function(r){return r.tier!=="out"&&r.tier!=="empty"}).slice(0,3);
   if(!c.length)return "";
-  return '<div class="decide"><div class="decide-h">この日に決める</div>'+c.map(function(r){var t=tierObj(r);
+  var hl=(ev.holding||[]).filter(function(d){return ev.dates.indexOf(d)>=0}).sort();
+  return '<div class="decide"><div class="decide-h">この日に決める</div>'+
+    (hl.length?'<div class="holdlist">⏸ 調整中：'+hl.map(function(d){return '<button class="chipbtn" data-hold="'+d+'" title="押すと調整中を外します">'+esc(dl(d))+' ✕</button>'}).join("")+'</div>':'')+
+    c.map(function(r){var t=tierObj(r);
     if(confirmDate===r.d)return '<div class="confirm">'+esc(dl(r.d))+' に決めますか？<button class="btn sm go2" data-decide="'+r.d+'">決める</button><button class="btn sub sm" data-cancel="1">やめる</button></div>';
     return '<button class="btn sm dbtn" data-ask="'+r.d+'"><span>'+esc(dl(r.d))+'</span><small class="tmark sm t-'+r.tier+'">'+t.mark+' '+t.name+'</small></button>'}).join("")+'</div>';
 }
@@ -1022,13 +1055,15 @@ function card(ev,r){
   var h='<article class="dcard t-'+r.tier+'"><div class="dhead">'+dlHtml(r.d)+'<span class="tier">'+t.mark+' '+t.name+'</span></div>'+
     '<p class="tdesc">'+desc+'</p>';
   if(list.length)h+='<ul class="who">'+list.map(function(x){var c=x.c;
-    var note=c.conf?"別の予定がこの日に決まったので自動で ×（元の回答は "+SYM[c.v].g+SYM[c.v].sub+"）"+(c.c?"／"+c.c:""):c.c;
-    if(c.v==="machi"&&c.until&&!c.conf)note=(note?note+"・":"")+md(c.until)+"に分かる";
-    return '<li>'+symHtml(c.conf?"x":c.v)+'<span class="nm">'+esc(x.n)+'</span>'+(c.conf?'<span class="chip warn">⚠ 別の予定</span>':'')+(note?'<em>'+esc(note)+'</em>':'')+'</li>'}).join("")+'</ul>';
+    var note=autoNote(c)?autoNote(c)+(c.c?"／"+c.c:""):c.c;
+    if((c.v==="machi"||c.hold)&&c.until&&!c.conf)note=(note?note+"・":"")+md(c.until)+"に分かる";
+    return '<li>'+symHtml(effV(c))+'<span class="nm">'+esc(x.n)+'</span>'+(c.conf?'<span class="chip warn">⚠ 別の予定</span>':c.hold?'<span class="chip hold">⏸ 別の募集で調整中</span>':'')+(note?'<em>'+esc(note)+'</em>':'')+'</li>'}).join("")+'</ul>';
   var foot=[];
   if(g.o.length)foot.push('○ <b>'+g.o.length+'人</b>：'+names(g.o));
   if(g.none.length)foot.push('回答まだ：'+names(g.none));
   if(foot.length)h+='<p class="oks">'+foot.join("　")+'</p>';
+  if(!ev.decided&&isOwner(ev.id))h+='<div class="holdrow"><button class="btn sub sm" data-hold="'+r.d+'">'+(isHold(ev,r.d)?'⏸ 調整中を外す':'⏸ この日で調整中にする')+'</button>'+
+    '<span class="note">調整中の日は、ほかの募集でこの日に○△の人が自動で △待 になります（いくつでも選べます）</span></div>';
   if(!ev.decided&&r.tier!=="out"&&isOwner(ev.id)){
     if(confirmDate===r.d)h+='<div class="confirm">'+dl(r.d)+' に決めますか？<button class="btn sm" data-decide="'+r.d+'">決める</button><button class="btn sub sm" data-cancel="1">やめる</button></div>';
     else h+='<div><button class="btn sm" data-ask="'+r.d+'">この日に決める</button></div>';
@@ -1121,7 +1156,7 @@ function renderAns(){
     '<p class="note">各候補の下に、ほかの人の回答と、いまの状態が出ています。</p>'+
     ev.dates.slice().sort().map(function(d){var r=draft.rows[d],tr=tierBy[d],t=tierObj(tr);
       var others=mem.filter(function(n){return norm(n)!==norm(draft.name)}).map(function(n){
-        var c=cellOf(ev,L,n,d),v=c?(c.conf?"x":c.v):"-",m=SYM[v],note=c?(c.conf?"別の予定が確定":c.c):"未回答";
+        var c=cellOf(ev,L,n,d),v=effV(c),m=SYM[v],note=c?(autoNote(c)||c.c):"未回答";
         return '<span class="mini s-'+(v==="-"?"none":v)+'" title="'+esc(n+"："+m.label+(note?"（"+note+"）":""))+'"><b>'+m.g+(m.sub?'<i>'+m.sub+'</i>':'')+'</b>'+esc(n)+(v==="machi"&&c&&c.until?'<small class="mu'+(c.until<today()?' late':'')+'">'+md(c.until)+'まで</small>':'')+(c&&(c.c||c.conf)?'<u>●</u>':'')+'</span>'}).join("");
       var x='<div class="arow'+(r.ref?' ref':'')+'"><div class="arow-top">'+dlHtml(d)+'<div class="symrow">'+ORDER.map(function(v){return symBtn(v,"set",d,r.v===v)}).join("")+'</div>'+
         '<button class="cbtn'+(r.c?' has':'')+'" data-cm="'+d+'" aria-label="'+dl(d)+'のひとこと">💬</button></div>'+
@@ -1306,6 +1341,11 @@ document.addEventListener("click",function(e){
   if(ds.row){selDate=ds.row;confirmDate=null;render();return}
   if(ds.ask){confirmDate=ds.ask;render();return}
   if(ds.cancel){confirmDate=null;render();return}
+  if(ds.hold){if(!isOwner(ev.id)||ev.decided)return;
+    var hs=(ev.holding||[]).slice(),hi=hs.indexOf(ds.hold);
+    if(hi>=0)hs.splice(hi,1);else hs.push(ds.hold);
+    ev.holding=hs;sendEvent(ev,"調整中");render();
+    toast(hi>=0?dl(ds.hold)+" の調整中を外しました":dl(ds.hold)+" を調整中にしました（ほかの募集では △待 になります）");return}
   if(ds.decide){if(!isOwner(ev.id))return;ev.decided=ds.decide;confirmDate=null;sendEvent(ev,"決定");render();toast(dl(ds.decide)+" に決めました");return}
   if(b.id==="undoDecide"){if(!isOwner(ev.id))return;ev.decided=null;sendEvent(ev,"決定取り消し");render();toast("決定を取り消しました");return}
   if(b.id==="copyLine"){
