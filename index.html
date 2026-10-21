@@ -700,7 +700,8 @@ function mergePending(id,ev){
   list.forEach(function(x){S.answers.push({ev:id,name:x.name,ts:1e12+x.at,a:x.a,n:x.n})});
   return ev;
 }
-function isOwner(id){return DEMO||KANJI||(jget(MINE)||[]).some(function(m){return m.id===id})}
+/* 幹事として「決める・調整中」を押せる端末：作った端末、幹事用URL、フリカレの鍵が入った端末（＝幹事本人の端末） */
+function isOwner(id){return DEMO||KANJI||isBoss()||(jget(MINE)||[]).some(function(m){return m.id===id})}
 
 /* 開いている募集と、その回答を読む */
 function loadMain(){
