@@ -761,9 +761,11 @@ function refresh(){
       var my=store(MYNAME),L=latest(ev.id),mine=my&&L[norm(my)];
       if(!isOwner(ev.id)&&!mine&&!ev.decided&&!Q.has("r"))tab="ans";
       /* 回答タブで始まって、前にこの端末で答えた名前があれば、その回答を読みこんでおく */
-      if(tab==="ans"&&!draft&&mine)draft=newDraft(ev,mine.name);
+      /* 回答タブで始まって、この端末に名前があれば、その名前で開く（前の回答を読みこむ／ほかの募集の回答の参照も聞く） */
+      var autoName=(tab==="ans"&&!draft&&my)?(mine?mine.name:my):"";
     }
     render();
+    if(autoName){setName(autoName);autoName=""}
     if(ev)return loadForeign(membersOf(ev).concat(store(MYNAME)?[store(MYNAME)]:[])).then(function(ch){if(ch)render()});
   }).then(schedule,schedule);
 }
@@ -1431,7 +1433,7 @@ document.addEventListener("click",function(e){
   S.events=S.events.filter(function(e){return e.id!==id});S.events.unshift(ev);S.cur=id;
   nd={dates:{},drag:null};
   /* 幹事の名前があれば、そのまま回答タブで幹事の都合を入れてもらう（送ると結果タブ＝URLを配る画面へ） */
-  tab=orgName?"ans":"res";draft=orgName?newDraft(ev,orgName):null;
+  tab=orgName?"ans":"res";draft=null;
   if(!DEMO){
     sendEvent(ev,"作成");
     var mine=jget(MINE)||[];mine.push({id:id,title:ev.title,deadline:ev.deadline,dates:ev.dates});jset(MINE,mine.slice(-50));
@@ -1440,6 +1442,8 @@ document.addEventListener("click",function(e){
     schedule();
   }
   render();window.scrollTo({top:0});toast(orgName?"募集をつくりました。続けて "+orgName+" さんの都合を入れてください":"募集をつくりました。URLを配りましょう");
+  /* 名前を入れたのと同じ流れで開く：ほかの募集で答えた ○△× を参照するかも聞く */
+  if(orgName)setName(orgName);
 });
 document.addEventListener("input",function(e){
   var t=e.target;
