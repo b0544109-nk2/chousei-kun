@@ -464,6 +464,7 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .cal button.have{outline:2px dashed rgba(139,123,255,.55);outline-offset:-3px}
   .orgmenu summary{font-weight:800}
   .emgrid{display:flex;flex-direction:column;gap:10px;margin-top:10px}
   .emlist{display:flex;flex-direction:column;gap:4px;max-height:16rem;overflow:auto;padding:2px}
@@ -1145,8 +1146,12 @@ function overlapInfo(ev,rows){
    候補日を消す・足す、タイトル・詳細・〆切・人数を直す。保存すると募集の行が1つ増える（新しい行が正）。
    消した候補日の回答はシートに残るが、表には出なくなる（候補を戻せばまた出る） */
 var orgMenuOpen=false;
+var EDIT_HAVE=null;
+/* いまの候補でいちばん多い時刻（足す日の時刻の初期値） */
+function commonTime(ev){var c={},best="",n=0;ev.dates.forEach(function(k){var t=kt(k);c[t]=(c[t]||0)+1;if(c[t]>n){n=c[t];best=t}});return best}
 function orgMenu(ev){
   var L=latest(ev.id);
+  EDIT_HAVE={};ev.dates.forEach(function(k){EDIT_HAVE[kd(k)]=1});
   var rows=ev.dates.slice().sort().map(function(d,i){
     var n=0;Object.keys(L).forEach(function(k){var c=L[k].a[d];if(c&&c.v&&c.v!=="-")n++});
     return '<label class="emrow"><input type="checkbox" data-emdel="'+esc(d)+'"> <span>'+esc(dl(d))+'</span><small>'+(n?n+'人が回答ずみ':'回答なし')+(ev.decided===d?'・決定した日':'')+'</small></label>'}).join("");
@@ -1157,10 +1162,12 @@ function orgMenu(ev){
     '<div class="row"><label class="f" for="emDl">回答の〆切<input type="date" id="emDl" value="'+esc(ev.deadline)+'"></label>'+
     '<label class="f" for="emCount">人数<input type="number" id="emCount" min="1" max="200" value="'+(ev.count||"")+'" style="max-width:7em"></label></div>'+
     '<div class="f">候補日を消す <span class="note" style="display:inline">消したい日にチェック</span></div><div class="emlist">'+rows+'</div>'+
-    '<div class="f">候補日を足す</div><div class="row"><input type="date" id="emAddDate" style="width:auto"><input type="text" id="emAddTime" list="timeList" placeholder="時刻（例：19:00〜）" style="flex:1 1 9em;min-width:0">'+
-    '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist></div>'+
-    '<div class="emadded" id="emAdded"></div>'+
-    '<div class="row"><button class="btn sub sm" data-em="add">＋ この日を足す</button></div>'+
+    '<div class="f">候補日を足す <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます（点線の日はもう候補にある日）</span></div>'+
+    '<div class="cals" id="cals">'+(function(){var t=new Date(),h2="";for(var i=0;i<CAL_FIRST;i++)h2+=calHtml(new Date(t.getFullYear(),t.getMonth()+i,1));return h2})()+'</div>'+farPicker()+
+    '<label class="f" for="nTime">足す日の時刻<input type="text" id="nTime" list="timeList" value="'+esc(commonTime(ev))+'"></label>'+
+    '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
+    '<div class="row"><button class="btn sub sm" data-tall="1">選んだ日を全部この時刻にする</button></div>'+
+    '<div class="picked" id="picked"></div>'+
     '<p class="note">消した日の回答はシートに残ります（表には出なくなります）。保存すると、みんなの画面にも30秒ほどで反映されます。</p>'+
     '<div class="row"><button class="btn go2" data-em="save">変更を保存</button><button class="btn sub sm" data-em="close">閉じる</button></div>'+
     '</div></details>';
@@ -1176,6 +1183,7 @@ function emSave(ev){
   var del={};document.querySelectorAll("[data-emdel]").forEach(function(c){if(c.checked)del[c.dataset.emdel]=1});
   var dates=ev.dates.filter(function(d){return !del[d]});
   emAdds.forEach(function(k){if(dates.indexOf(k)<0)dates.push(k)});
+  var added=0;Object.keys(nd.dates).forEach(function(d){(nd.dates[d]||[""]).forEach(function(t){t=String(t||"").trim();var k=t?d+"@"+t:d;if(dates.indexOf(k)<0){dates.push(k);added++}})});
   if(!dates.length){toast("候補日を1つ以上のこしてください");return}
   ev.title=title.slice(0,80);ev.memo=g("emMemo").trim().slice(0,2000);
   if(g("emDl"))ev.deadline=g("emDl");
@@ -1184,10 +1192,10 @@ function emSave(ev){
   ev.holding=(ev.holding||[]).filter(function(d){return ev.dates.indexOf(d)>=0});
   if(ev.decided&&ev.dates.indexOf(ev.decided)<0)ev.decided=null;
   if(selDate&&ev.dates.indexOf(selDate)<0)selDate=null;
-  emAdds=[];orgMenuOpen=false;
+  emAdds=[];orgMenuOpen=false;nd={dates:{},drag:null};farMonth="";
   sendEvent(ev,"編集");render();
-  var nd=Object.keys(del).length;
-  toast("保存しました"+(nd?"（候補を"+nd+"件消しました）":""));
+  var nDel=Object.keys(del).length;
+  toast("保存しました"+(nDel||added?"（"+(added?"候補を"+added+"件足しました":"")+(added&&nDel?"・":"")+(nDel?nDel+"件消しました":"")+"）":""));
 }
 function decideBox(ev,rows){
   if(ev.decided||!isOwner(ev.id))return "";
@@ -1346,7 +1354,8 @@ function symGuide(){
   return '<details class="guide"'+(open?' open':'')+' id="symGuide"><summary>記号の意味</summary><ul>'+
     ORDER.map(function(v){var g=SYM_GUIDE[v];return '<li>'+symHtml(v)+'<div><b>'+g[0]+'</b><span>'+g[1]+'</span></div></li>'}).join("")+'</ul></details>';
 }
-document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="orgMenu"){orgMenuOpen=e.target.open;if(!orgMenuOpen)emAdds=[]}},true);
+document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="orgMenu"){orgMenuOpen=e.target.open;
+  if(!orgMenuOpen){emAdds=[];nd={dates:{},drag:null}}else{refreshPicked();if(!BUSY)loadBusy()}}},true);
 document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="symGuide")store("sorouhi.guide",e.target.open?"open":"close")},true);
 /* ほかの日で、同じ △ に入れた理由（新しく入れた順に3つまで）。押すとこの日の理由に入る（△待なら「いつ分かる」も） */
 function reasonChips(d,r){
@@ -1383,7 +1392,7 @@ function loadBusy(){
       return crypto.subtle.decrypt({name:"AES-GCM",iv:b64(j.iv)},key,b64(j.ct))});
   }).then(function(buf){
     BUSY=JSON.parse(new TextDecoder().decode(buf)).days||{};
-    if(tab!=="new")return;
+    if(tab!=="new"&&!orgMenuOpen)return;
     /* 入力中の内容を消さないよう、画面は描き直さずに印だけ付ける */
     document.querySelectorAll(".cal button[data-day]").forEach(function(b){var t=BUSY[b.dataset.day];if(t){b.classList.add("busy");b.title=t}});
     var n=document.getElementById("busyNote");if(n)n.hidden=false;
@@ -1401,6 +1410,7 @@ function farPicker(){
     '<div class="cals" id="farCal">'+shown+'</div></div>';
 }
 function renderNew(){
+  EDIT_HAVE=null;   /* 幹事メニューの「もう候補にある日」の印は作成画面では使わない */
   var t=new Date(),h='<section class="panel"><div class="sec-h" style="margin:0">新しい募集</div>'+
     '<label class="f" for="nTitle">タイトル<input type="text" id="nTitle" placeholder="例）新年会の日決め"></label>'+
     '<label class="f" for="nOrg">幹事の名前<input type="text" id="nOrg" placeholder="例）nk2" value="'+esc(store(MYNAME)||"")+'"></label>'+
@@ -1424,8 +1434,8 @@ function calHtml(m){
   var h='<div class="cal"><h4>'+y+'年 '+(mo+1)+'月</h4><div class="g">'+"日月火水木金土".split("").map(function(w){return '<span class="w">'+w+'</span>'}).join("");
   for(var i=0;i<first;i++)h+='<span></span>';
   for(var d=1;d<=n;d++){var s=iso(new Date(y,mo,d));
-    var bz=BUSY&&BUSY[s];
-    h+='<button data-day="'+s+'" class="'+dowClass(s)+(nd.dates[s]?' on':'')+(bz?' busy':'')+'"'+(bz?' title="'+esc(bz)+'"':'')+(s<td?' disabled':'')+'>'+d+'</button>'}
+    var bz=BUSY&&BUSY[s],hv=EDIT_HAVE&&EDIT_HAVE[s];
+    h+='<button data-day="'+s+'" class="'+dowClass(s)+(nd.dates[s]?' on':'')+(bz?' busy':'')+(hv?' have':'')+'"'+(bz||hv?' title="'+esc((hv?'もう候補にある日':'')+(bz&&hv?'／':'')+(bz||''))+'"':'')+(s<td?' disabled':'')+'>'+d+'</button>'}
   return h+'</div></div>';
 }
 /* ---- 前の募集の候補日（時刻つき）をコピー ----
@@ -1508,6 +1518,7 @@ function render(){
   var v=document.getElementById("view");
   v.innerHTML='<div style="display:flex;flex-direction:column;gap:14px">'+body+'</div>';
   if(tab==="new"){refreshPicked();fillCopyBox()}
+  else if(tab==="res"&&orgMenuOpen)refreshPicked();
   renderExtra();
 }
 var toastT;
@@ -1533,7 +1544,7 @@ document.addEventListener("click",function(e){
   if(ds.cancel){confirmDate=null;render();return}
   if(ds.em){if(!isOwner(ev.id))return;
     if(ds.em==="save"){emSave(ev);return}
-    if(ds.em==="close"){orgMenuOpen=false;emAdds=[];var om=document.getElementById("orgMenu");if(om)om.open=false;return}
+    if(ds.em==="close"){orgMenuOpen=false;emAdds=[];nd={dates:{},drag:null};var om=document.getElementById("orgMenu");if(om)om.open=false;return}
     if(ds.em==="add"){var ad=(document.getElementById("emAddDate")||{}).value,at=((document.getElementById("emAddTime")||{}).value||"").trim();
       if(!ad){toast("足す日を選んでください");return}
       var k=at?ad+"@"+at:ad;if(ev.dates.indexOf(k)>=0||emAdds.indexOf(k)>=0){toast("その候補はもうあります");return}
