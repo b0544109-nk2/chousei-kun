@@ -13,8 +13,8 @@
 <meta property="og:image" content="https://b0544109-nk2.github.io/chousei-kun/ogp.png">
 <meta name="twitter:card" content="summary_large_image">
 <!--/OGP-->
-<link rel="icon" type="image/png" href="favicon.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png?v=cowboy1">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=cowboy1">
 <script src="config.js"></script>
 <script>
 /* ---- アプリの中のブラウザ（X・LINE・Instagram など）で開かれたとき ----
@@ -1085,8 +1085,12 @@ function shareBox(ev){
 }
 /* 最後の1人が回答したときのお知らせ */
 function doneText(ev){
-  var best=analyze(ev)[0],t=tierObj(best);
-  return "【"+ev.title+"】全員の回答がそろいました！🎉\nいちばん近いのは "+dl(best.d)+"（"+t.name+"）\n幹事さん、日程を決めてください🙏"+(doneWho?"（最後に答えた "+doneWho+" より）":"")+"\n結果はこちら → "+resultUrl(ev);
+  /* 全員そろう順の上位3つまで（来られない人がいる日・まだ誰も答えていない日は除く） */
+  var top=analyze(ev).filter(function(r){return r.tier!=="out"&&r.tier!=="empty"}).slice(0,3);
+  if(!top.length)top=analyze(ev).slice(0,1);
+  var lines=top.length===1?"いちばん近いのは "+dl(top[0].d)+"（"+tierObj(top[0]).name+"）":
+    "近い順に\n"+top.map(function(r,i){return (i+1)+". "+dl(r.d)+"（"+tierObj(r).name+"）"}).join("\n");
+  return "【"+ev.title+"】全員の回答がそろいました！🎉\n"+lines+"\n幹事さん、日程を決めてください🙏"+(doneWho?"（最後に答えた "+doneWho+" より）":"")+"\n結果はこちら → "+resultUrl(ev);
 }
 var doneWho="";
 var doneCopied=false;
