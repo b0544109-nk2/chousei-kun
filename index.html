@@ -464,6 +464,13 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .orgmenu summary{font-weight:800}
+  .emgrid{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .emlist{display:flex;flex-direction:column;gap:4px;max-height:16rem;overflow:auto;padding:2px}
+  .emrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,.65);font-size:.86rem;font-weight:700;cursor:pointer}
+  .emrow small{font-size:.7rem;color:var(--muted)}
+  .emrow:has(input:checked){background:#ffe0e6;text-decoration:line-through}
+  .emadded{display:flex;flex-wrap:wrap;gap:6px}
   .xs.hold{background:rgba(143,208,255,.35);color:#1e5b8f}
   .holdsum{margin-top:4px;padding:8px 12px;border-radius:14px;background:rgba(143,208,255,.25);color:#1e5b8f;font-size:.84rem;font-weight:700;line-height:1.5}
   .ovbox{margin-top:4px;font-size:.8rem}
@@ -831,9 +838,9 @@ function refresh(){
       /* 回答タブで始まって、この端末に名前があれば、その名前で開く（前の回答を読みこむ／ほかの募集の回答の参照も聞く） */
       var autoName=(tab==="ans"&&!draft&&my)?(mine?mine.name:my):"";
     }
-    render();
+    if(!(tab==="res"&&orgMenuOpen))render();
     if(autoName){setName(autoName);autoName=""}
-    if(ev)return loadForeign(membersOf(ev).concat(store(MYNAME)?[store(MYNAME)]:[])).then(function(ch){if(ch)render()});
+    if(ev)return loadForeign(membersOf(ev).concat(store(MYNAME)?[store(MYNAME)]:[])).then(function(ch){if(ch&&!(tab==="res"&&orgMenuOpen))render()});
   }).then(schedule,schedule);
 }
 /* ================= ページの下：ほかの募集へのリンク =================
@@ -1110,6 +1117,7 @@ function renderRes(){
     '</tbody></table></div><p class="note">右上の点はひとことあり、⚠× は別の募集がその日に決まったので自動で × にした人です。✕ の行は来られない人がいる日です。</p>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
+  if(isOwner(ev.id))h+=orgMenu(ev);
   h+='<section class="panel"><div class="legend">'+["o","ka","machi","kiken","x"].map(function(v){return '<div>'+symHtml(v)+SYM[v].label+'</div>'}).join("")+'</div></section>';
   return h;
 }
@@ -1132,6 +1140,54 @@ function overlapInfo(ev,rows){
   });
   if(!items.length)return "";
   return '<details class="ovbox"'+(items.length<=3?' open':'')+'><summary>ほかの予定と重なっている人（'+items.length+'）</summary><ul>'+items.join("")+'</ul></details>';
+}
+/* ---- 幹事メニュー ----
+   候補日を消す・足す、タイトル・詳細・〆切・人数を直す。保存すると募集の行が1つ増える（新しい行が正）。
+   消した候補日の回答はシートに残るが、表には出なくなる（候補を戻せばまた出る） */
+var orgMenuOpen=false;
+function orgMenu(ev){
+  var L=latest(ev.id);
+  var rows=ev.dates.slice().sort().map(function(d,i){
+    var n=0;Object.keys(L).forEach(function(k){var c=L[k].a[d];if(c&&c.v&&c.v!=="-")n++});
+    return '<label class="emrow"><input type="checkbox" data-emdel="'+esc(d)+'"> <span>'+esc(dl(d))+'</span><small>'+(n?n+'人が回答ずみ':'回答なし')+(ev.decided===d?'・決定した日':'')+'</small></label>'}).join("");
+  return '<details class="fold orgmenu" id="orgMenu"'+(orgMenuOpen?' open':'')+'><summary>⚙ 幹事メニュー（候補日・〆切・詳細を直す）</summary>'+
+    '<div class="emgrid">'+
+    '<label class="f" for="emTitle">タイトル<input type="text" id="emTitle" value="'+esc(ev.title)+'"></label>'+
+    '<label class="f" for="emMemo">詳細<textarea id="emMemo">'+esc(ev.memo)+'</textarea></label>'+
+    '<div class="row"><label class="f" for="emDl">回答の〆切<input type="date" id="emDl" value="'+esc(ev.deadline)+'"></label>'+
+    '<label class="f" for="emCount">人数<input type="number" id="emCount" min="1" max="200" value="'+(ev.count||"")+'" style="max-width:7em"></label></div>'+
+    '<div class="f">候補日を消す <span class="note" style="display:inline">消したい日にチェック</span></div><div class="emlist">'+rows+'</div>'+
+    '<div class="f">候補日を足す</div><div class="row"><input type="date" id="emAddDate" style="width:auto"><input type="text" id="emAddTime" list="timeList" placeholder="時刻（例：19:00〜）" style="flex:1 1 9em;min-width:0">'+
+    '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist></div>'+
+    '<div class="emadded" id="emAdded"></div>'+
+    '<div class="row"><button class="btn sub sm" data-em="add">＋ この日を足す</button></div>'+
+    '<p class="note">消した日の回答はシートに残ります（表には出なくなります）。保存すると、みんなの画面にも30秒ほどで反映されます。</p>'+
+    '<div class="row"><button class="btn go2" data-em="save">変更を保存</button><button class="btn sub sm" data-em="close">閉じる</button></div>'+
+    '</div></details>';
+}
+var emAdds=[];
+function emRefreshAdded(){
+  var el=document.getElementById("emAdded");if(!el)return;
+  el.innerHTML=emAdds.map(function(k,i){return '<span class="chip">＋ '+esc(dl(k))+' <button class="tdel" data-emun="'+i+'" aria-label="取り消す">✕</button></span>'}).join("");
+}
+function emSave(ev){
+  var g=function(id){var e=document.getElementById(id);return e?e.value:""};
+  var title=g("emTitle").trim();if(!title){toast("タイトルを入れてください");return}
+  var del={};document.querySelectorAll("[data-emdel]").forEach(function(c){if(c.checked)del[c.dataset.emdel]=1});
+  var dates=ev.dates.filter(function(d){return !del[d]});
+  emAdds.forEach(function(k){if(dates.indexOf(k)<0)dates.push(k)});
+  if(!dates.length){toast("候補日を1つ以上のこしてください");return}
+  ev.title=title.slice(0,80);ev.memo=g("emMemo").trim().slice(0,2000);
+  if(g("emDl"))ev.deadline=g("emDl");
+  ev.count=Math.min(200,Math.max(0,parseInt(g("emCount"),10)||0))||null;
+  ev.dates=dates.sort().slice(0,60);
+  ev.holding=(ev.holding||[]).filter(function(d){return ev.dates.indexOf(d)>=0});
+  if(ev.decided&&ev.dates.indexOf(ev.decided)<0)ev.decided=null;
+  if(selDate&&ev.dates.indexOf(selDate)<0)selDate=null;
+  emAdds=[];orgMenuOpen=false;
+  sendEvent(ev,"編集");render();
+  var nd=Object.keys(del).length;
+  toast("保存しました"+(nd?"（候補を"+nd+"件消しました）":""));
 }
 function decideBox(ev,rows){
   if(ev.decided||!isOwner(ev.id))return "";
@@ -1290,6 +1346,7 @@ function symGuide(){
   return '<details class="guide"'+(open?' open':'')+' id="symGuide"><summary>記号の意味</summary><ul>'+
     ORDER.map(function(v){var g=SYM_GUIDE[v];return '<li>'+symHtml(v)+'<div><b>'+g[0]+'</b><span>'+g[1]+'</span></div></li>'}).join("")+'</ul></details>';
 }
+document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="orgMenu"){orgMenuOpen=e.target.open;if(!orgMenuOpen)emAdds=[]}},true);
 document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="symGuide")store("sorouhi.guide",e.target.open?"open":"close")},true);
 /* ほかの日で、同じ △ に入れた理由（新しく入れた順に3つまで）。押すとこの日の理由に入る（△待なら「いつ分かる」も） */
 function reasonChips(d,r){
@@ -1474,6 +1531,15 @@ document.addEventListener("click",function(e){
   if(ds.row){selDate=ds.row;confirmDate=null;render();return}
   if(ds.ask){confirmDate=ds.ask;render();return}
   if(ds.cancel){confirmDate=null;render();return}
+  if(ds.em){if(!isOwner(ev.id))return;
+    if(ds.em==="save"){emSave(ev);return}
+    if(ds.em==="close"){orgMenuOpen=false;emAdds=[];var om=document.getElementById("orgMenu");if(om)om.open=false;return}
+    if(ds.em==="add"){var ad=(document.getElementById("emAddDate")||{}).value,at=((document.getElementById("emAddTime")||{}).value||"").trim();
+      if(!ad){toast("足す日を選んでください");return}
+      var k=at?ad+"@"+at:ad;if(ev.dates.indexOf(k)>=0||emAdds.indexOf(k)>=0){toast("その候補はもうあります");return}
+      emAdds.push(k);emRefreshAdded();document.getElementById("emAddDate").value="";return}
+    return}
+  if(ds.emun){emAdds.splice(+ds.emun,1);emRefreshAdded();return}
   if(ds.hold){if(!isOwner(ev.id)||ev.decided)return;
     var hs=(ev.holding||[]).slice(),hi=hs.indexOf(ds.hold);
     if(hi>=0)hs.splice(hi,1);else hs.push(ds.hold);
