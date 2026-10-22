@@ -464,6 +464,7 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .done-confirm{display:flex;flex-direction:column;gap:8px;font-size:.8rem;font-weight:700;color:#c0304f;background:#ffe9ee;border-radius:14px;padding:10px 12px;width:100%}
   h1 .cowboy{-webkit-text-fill-color:initial;margin-left:.08em;font-size:.9em}
   .addbox{background:rgba(255,255,255,.5);border:1px solid var(--glass-edge);border-radius:16px;padding:8px 12px}
   .addbox>summary{cursor:pointer;font-weight:800;font-size:.9rem}
@@ -589,9 +590,12 @@
     <button class="btn go done-copy" id="doneCopy">📋 知らせる文をコピー</button>
     <div class="row" style="justify-content:center">
       <a class="btn line sm" id="doneLine" href="#" target="_blank" rel="noopener">LINEで送る</a>
-      <a class="btn sm xdm" id="doneX" href="#" target="_blank" rel="noopener">XのDMで送る</a>
     </div>
-    <button class="linkbtn" id="doneClose">あとで</button>
+    <button class="linkbtn" id="doneClose">コピーせずに閉じる</button>
+    <div class="done-confirm" id="doneConfirm" hidden>
+      <span>まだコピーしていません。閉じると、この文はもう出てきません。</span>
+      <div class="row" style="justify-content:center"><button class="btn sm" id="doneBack">コピーに戻る</button><button class="btn sub sm" id="doneCloseSure">それでも閉じる</button></div>
+    </div>
   </div>
 </div>
 
@@ -1085,13 +1089,17 @@ function doneText(ev){
   return "【"+ev.title+"】全員の回答がそろいました！🎉\nいちばん近いのは "+dl(best.d)+"（"+t.name+"）\n幹事さん、日程を決めてください🙏"+(doneWho?"（最後に答えた "+doneWho+" より）":"")+"\n結果はこちら → "+resultUrl(ev);
 }
 var doneWho="";
+var doneCopied=false;
 function showDone(ev,who){
+  doneCopied=false;
+  document.getElementById("doneClose").textContent="コピーせずに閉じる";
+  document.getElementById("doneClose").hidden=false;
+  document.getElementById("doneConfirm").hidden=true;
   doneWho=who||"";
   var txt=doneText(ev);
   document.getElementById("doneText").textContent=txt;
   document.getElementById("doneCopy").textContent="📋 知らせる文をコピー";
   document.getElementById("doneLine").href="https://line.me/R/share?text="+encodeURIComponent(txt);
-  document.getElementById("doneX").href="https://x.com/messages/compose?text="+encodeURIComponent(txt);
   document.getElementById("doneModal").hidden=false;
 }
 function copyText(txt,okMsg){
@@ -1547,8 +1555,14 @@ document.addEventListener("click",function(e){
   if(b.id==="tabRes"){tab="res";confirmDate=null;render();return}
   if(b.id==="tabAns"){tab="ans";if(!draft||draft.ev!==ev.id){var my=store(MYNAME);draft=null;if(my&&membersOf(ev).some(function(n){return norm(n)===norm(my)})){setName(my);return}}render();return}
   if(ds.ev){if(ds.ev==="__new"){tab="new"}else{S.cur=ds.ev;save();if(tab==="new")tab="res";draft=null}confirmDate=null;render();window.scrollTo({top:0});return}
-  if(b.id==="doneClose"){document.getElementById("doneModal").hidden=true;return}
-  if(b.id==="doneCopy"){copyText(doneText(ev),"知らせる文をコピーしました");if(!document.getElementById("doneModal").hidden)b.textContent="✓ コピーしました！グループに貼ってね";return}
+  if(b.id==="doneClose"){
+    if(doneCopied){document.getElementById("doneModal").hidden=true;return}
+    b.hidden=true;document.getElementById("doneConfirm").hidden=false;return}
+  if(b.id==="doneBack"){document.getElementById("doneConfirm").hidden=true;document.getElementById("doneClose").hidden=false;document.getElementById("doneCopy").focus();return}
+  if(b.id==="doneCloseSure"){document.getElementById("doneModal").hidden=true;return}
+  if(b.id==="doneCopy"){copyText(doneText(ev),"知らせる文をコピーしました");
+    if(!document.getElementById("doneModal").hidden){doneCopied=true;var dc=document.getElementById("doneClose");dc.textContent="とじる";dc.hidden=false;document.getElementById("doneConfirm").hidden=true}
+    if(!document.getElementById("doneModal").hidden)b.textContent="✓ コピーしました！グループに貼ってね";return}
   if(b.id==="copyUrl"){copyText(shareUrl(ev),"URLをコピーしました");return}
   if(b.id==="copyMsg"){copyText(shareText(ev),"案内文をコピーしました");return}
   if(b.id==="resetDemo"){S=seed();draft=null;unstar={};tab="res";render();toast("見本データに戻しました");return}
@@ -1620,6 +1634,10 @@ document.addEventListener("click",function(e){
     if(last)showDone(ev,sentName);
     return;
   }
+});
+document.addEventListener("click",function(e){
+  var a=e.target.closest&&e.target.closest("#doneLine");if(!a)return;
+  doneCopied=true;var dc=document.getElementById("doneClose");dc.textContent="とじる";dc.hidden=false;document.getElementById("doneConfirm").hidden=true;
 });
 document.addEventListener("click",function(e){
   var b=e.target.closest("#create");if(!b)return;
