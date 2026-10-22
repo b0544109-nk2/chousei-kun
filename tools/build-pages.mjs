@@ -58,7 +58,7 @@ async function loadEvents() {
 
 const tpl = readFileSync('index.html', 'utf8');
 function pageFor(id, j) {
-  const title = (j.decided ? `【決定 ${label(j.decided)}】` : `【〆${label(j.deadline)}】`) + j.title + '｜調整くんっ！';
+  const title = (j.decided ? `【決定 ${label(j.decided)}】` : `【〆${label(j.deadline)}】`) + j.title + '｜調整くんっ！🤠';
   const memo = String(j.memo || '').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
   const desc = j.decided ? `${label(j.decided)} に決まりました。` :
     `候補 ${j.dates.length}つ・回答〆切 ${label(j.deadline)}。全員そろう日をさがしています。` + (memo ? ' ' + memo.slice(0, 60) : '');
@@ -67,7 +67,7 @@ function pageFor(id, j) {
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(desc)}">`,
     `<meta property="og:type" content="website">`,
-    `<meta property="og:site_name" content="調整くんっ！">`,
+    `<meta property="og:site_name" content="調整くんっ！🤠">`,
     `<meta property="og:title" content="${esc(title)}">`,
     `<meta property="og:description" content="${esc(desc)}">`,
     `<meta property="og:url" content="${esc(base + 'e/' + id + '/')}">`,

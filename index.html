@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <!--OGP-->
-<title>調整くんっ！</title>
+<title>調整くんっ！🤠</title>
 <meta name="description" content="○△×で都合を集める日程調整サイト">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="調整くんっ！">
-<meta property="og:title" content="調整くんっ！">
+<meta property="og:site_name" content="調整くんっ！🤠">
+<meta property="og:title" content="調整くんっ！🤠">
 <meta property="og:description" content="○△×で都合を集める日程調整サイト">
 <meta property="og:image" content="https://b0544109-nk2.github.io/chousei-kun/ogp.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -464,6 +464,7 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  h1 .cowboy{-webkit-text-fill-color:initial;margin-left:.08em;font-size:.9em}
   .addbox{background:rgba(255,255,255,.5);border:1px solid var(--glass-edge);border-radius:16px;padding:8px 12px}
   .addbox>summary{cursor:pointer;font-weight:800;font-size:.9rem}
   .addbox[open]{display:flex;flex-direction:column;gap:10px}
@@ -554,7 +555,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>調整くんっ<span class="dot">！</span></h1>
+    <h1>調整くんっ<span class="dot">！</span><span class="cowboy" aria-hidden="true">🤠</span></h1>
     <span class="demo-note" id="demoNote" hidden>見本データで動いています（送信はされません）</span>
   </header>
 
@@ -1502,7 +1503,7 @@ function refreshPicked(){
 
 /* ---- 描画とイベント ---- */
 /* LINEなどに貼ったときに出るタイトル。本番では募集ごとのページのタイトルとプレビュー用の情報（OGP）にも同じ文を入れる */
-function pageTitle(ev){return "【〆"+md(ev.deadline)+"("+wd(ev.deadline)+")】"+ev.title+"｜調整くんっ！"}
+function pageTitle(ev){return "【〆"+md(ev.deadline)+"("+wd(ev.deadline)+")】"+ev.title+"｜調整くんっ！🤠"}
 /* 読みこみ中・見つからない・まだつながっていない のとき */
 function renderState(){
   if(!READY)return '<section class="panel"><div class="sec-h" style="margin:0">まだシートにつながっていません</div>'+
@@ -1525,9 +1526,9 @@ function renderTop(){
 function render(){
   renderBar();
   var ev=cur(),body;
-  if(tab==="new"&&!READY){document.title="調整くんっ！";body=renderState()}
-  else if(tab==="new"){document.title="新しい募集｜調整くんっ！";body=renderTop()}
-  else if(!READY||!ev){document.title="調整くんっ！";body=renderState()}
+  if(tab==="new"&&!READY){document.title="調整くんっ！🤠";body=renderState()}
+  else if(tab==="new"){document.title="新しい募集｜調整くんっ！🤠";body=renderTop()}
+  else if(!READY||!ev){document.title="調整くんっ！🤠";body=renderState()}
   else{document.title=pageTitle(ev);body=tab==="res"?renderRes():renderAns();if(tab==="res")checkPage(ev)}
   var v=document.getElementById("view");
   v.innerHTML='<div style="display:flex;flex-direction:column;gap:14px">'+body+'</div>';
