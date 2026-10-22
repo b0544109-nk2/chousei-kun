@@ -464,6 +464,14 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .addbox{background:rgba(255,255,255,.5);border:1px solid var(--glass-edge);border-radius:16px;padding:8px 12px}
+  .addbox>summary{cursor:pointer;font-weight:800;font-size:.9rem}
+  .addbox[open]{display:flex;flex-direction:column;gap:10px}
+  .addbox[open]>summary{margin-bottom:2px}
+  .calfolds{display:flex;flex-direction:column;gap:6px}
+  .calfold>summary{cursor:pointer;font-weight:800;font-size:.86rem;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,.7)}
+  .calfold[open]>summary{margin-bottom:6px}
+  .calfold .cal{max-width:22rem}
   .cal button.have{outline:2px dashed rgba(139,123,255,.55);outline-offset:-3px}
   .orgmenu summary{font-weight:800}
   .emgrid{display:flex;flex-direction:column;gap:10px;margin-top:10px}
@@ -1166,12 +1174,14 @@ function orgMenu(ev){
     '<div class="row"><label class="f" for="emDl">回答の〆切<input type="date" id="emDl" value="'+esc(ev.deadline)+'"></label>'+
     '<label class="f" for="emCount">人数<input type="number" id="emCount" min="1" max="200" value="'+(ev.count||"")+'" style="max-width:7em"></label></div>'+
     '<div class="f">候補日を消す <span class="note" style="display:inline">消したい日にチェック</span></div><div class="emlist">'+rows+'</div>'+
-    '<div class="f">候補日を足す <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます（点線の日はもう候補にある日）</span></div>'+
-    '<div class="cals" id="cals">'+(function(){var t=new Date(),h2="";for(var i=0;i<CAL_FIRST;i++)h2+=calHtml(new Date(t.getFullYear(),t.getMonth()+i,1));return h2})()+'</div>'+farPicker()+
+    '<details class="addbox" id="emAdd"><summary>＋ 候補日を足す</summary>'+
+    '<p class="note">足したい月を開いて、日付をタップ（点線の日はもう候補にある日）</p>'+
+    '<div class="calfolds" id="cals">'+(function(){var t=new Date(),h2="";for(var i=0;i<CAL_FIRST;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);
+      h2+='<details class="calfold"><summary>'+m.getFullYear()+'年 '+(m.getMonth()+1)+'月</summary>'+calHtml(m)+'</details>'}return h2})()+'</div>'+farPicker()+
     '<label class="f" for="nTime">足す日の時刻<input type="text" id="nTime" list="timeList" value="'+esc(commonTime(ev))+'"></label>'+
     '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
     '<div class="row"><button class="btn sub sm" data-tall="1">選んだ日を全部この時刻にする</button></div>'+
-    '<div class="picked" id="picked"></div>'+
+    '<div class="picked" id="picked"></div></details>'+
     '<p class="note">消した日の回答はシートに残ります（表には出なくなります）。保存すると、みんなの画面にも30秒ほどで反映されます。</p>'+
     '<div class="row"><button class="btn go2" data-em="save">変更を保存</button><button class="btn sub sm" data-em="close">閉じる</button></div>'+
     '</div></details>';
