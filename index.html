@@ -785,11 +785,15 @@ function mergePending(id,ev){
 }
 /* 幹事として「決める・調整中」を押せる端末：作った端末、幹事用URL、フリカレの鍵が入った端末（＝幹事本人の端末） */
 function isOwner(id){
-  if(DEMO||KANJI||isBoss()||(jget(MINE)||[]).some(function(m){return m.id===id}))return true;
-  /* 幹事の名前：どの端末でも、その名前で回答した（＝名前を覚えている）端末なら幹事。身内用なので名前の一致だけで判定 */
   var e=evById(id),my=store(MYNAME);
-  return !!(e&&e.org&&my&&norm(e.org)===norm(my));
+  if(DEMO||KANJI||(jget(MINE)||[]).some(function(m){return m.id===id}))return true;
+  /* 幹事の名前が入っている募集は、その名前の人だけ（どの端末でも、その名前で回答した端末なら幹事。身内用なので名前の一致だけで判定） */
+  if(e&&e.org)return !!(my&&norm(e.org)===norm(my));
+  /* 幹事の名前が入っていない昔の募集は、フリカレの鍵がある端末（＝nk2）なら幹事 */
+  return isBoss();
 }
+/* 「すべての募集」に出すのは自分の募集だけ（幹事の名前が自分か、名前が入っていない昔の募集） */
+function isMyEvent(e){var my=store(MYNAME);return !e.org||!!(my&&norm(e.org)===norm(my))}
 
 /* 開いている募集と、その回答を読む */
 function loadMain(){
@@ -867,7 +871,7 @@ function loadExtra(){
     Promise.all([gviz("募集"),gviz("回答","select B, C")]).then(function(r){
       var evs=parseEvents(r[0]),cnt={};
       r[1].forEach(function(row){var id=safeId(row[0]);(cnt[id]=cnt[id]||{})[row[1]]=1});
-      allEvents=Object.keys(evs).map(function(id){var e=evs[id];e.answers=Object.keys(cnt[id]||{}).length;return e});
+      allEvents=Object.keys(evs).map(function(id){var e=evs[id];e.answers=Object.keys(cnt[id]||{}).length;return e}).filter(isMyEvent);
       renderExtra();
     }).catch(function(){});
     return;
@@ -892,7 +896,7 @@ function renderExtra(){
       if(!!a.decided!==!!b.decided)return a.decided?1:-1;
       return a.decided?(a.decided<b.decided?1:-1):((a.deadline||"9")<(b.deadline||"9")?-1:1)});
     var open=list.filter(function(e){return !e.decided}).length;
-    h+='<details class="fold xbox"'+(tab==="new"?' open':'')+'><summary>📋 すべての募集（調整中 '+open+'・決定 '+(list.length-open)+'）<small>幹事の端末だけに表示</small></summary><ul class="xlist">'+
+    h+='<details class="fold xbox"'+(tab==="new"?' open':'')+'><summary>📋 自分の募集（調整中 '+open+'・決定 '+(list.length-open)+'）<small>幹事の端末だけに表示</small></summary><ul class="xlist">'+
       list.map(function(e){return '<li'+(e.id===EID?' class="cur"':'')+'><a href="'+esc(BASE+"?e="+e.id)+'">'+esc(e.title)+'</a>'+evStatus(e)+
         (!e.decided&&e.holding&&e.holding.length?'<span class="xs hold">⏸ 調整中 '+e.holding.slice().sort().map(function(d){return esc(md(d)+"("+wd(d)+")")}).join("・")+'</span>':'')+
         '<span class="xs">回答 '+e.answers+(e.count?'/'+e.count:'')+'人</span>'+(mine[e.id]?'':'<span class="xs other">ほかの端末で作成</span>')+'</li>'}).join("")+'</ul></details>';
