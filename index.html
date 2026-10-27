@@ -991,6 +991,7 @@ function cellOf(ev,L,name,d){
   if(!r.conf&&(r.v==="o"||r.v==="ka")){var oh=holdOf(ev,name,d);if(oh){r.hold=oh;r.eff="machi";if(!r.until)r.until=oh.deadline||""}}
   return r;
 }
+function allIn(ev,n){return ev.count?n>=ev.count:n>0}
 function analyze(ev,skip){
   var L=latest(ev.id),mem=membersOf(ev),us=unstar[ev.id]||{},sk=skip?norm(skip):null;
   return ev.dates.map(function(d){
@@ -1131,23 +1132,23 @@ function renderRes(){
   }else{
     var best=rows[0],t=tierObj(best);
     var okDates=rows.filter(function(r){return r.tier==="ok"}).map(function(r){return dl(r.d)});
-    var big=best.tier==="empty"?"まだ回答がありません。URLを送って回答を集めましょう":okDates.length?"全員そろうのは "+okDates.join("・"):best.tier==="out"?"いまは全員そろう日がありません":"いちばん近いのは "+dl(best.d)+"（"+t.name+"）";
-    var n=Object.keys(L).length;
-    h+='<section class="summary"><div class="big">'+esc(big)+'</div><p>'+(ev.count&&n>=ev.count?"🎉 全員（"+ev.count+"人）の回答がそろいました！みんなに連絡しましょう。":ev.count?"いま "+n+" / "+ev.count+"人が回答しています。あと"+(ev.count-n)+"人です。":n?"いま "+n+"人が回答しています。回答が増えると結果が変わります。":"URLを配って、回答を集めましょう。")+'</p>'+
+    var n=Object.keys(L).length,glow=okDates.length&&allIn(ev,n);
+    var big=best.tier==="empty"?esc("まだ回答がありません。URLを送って回答を集めましょう"):okDates.length?"全員そろうのは "+okDates.map(function(x){return glow?'<span class="rainbow">'+esc(x)+'</span>':esc(x)}).join("・"):esc(best.tier==="out"?"いまは全員そろう日がありません":"いちばん近いのは "+dl(best.d)+"（"+t.name+"）");
+    h+='<section class="summary"><div class="big">'+big+'</div><p>'+(ev.count&&n>=ev.count?"🎉 全員（"+ev.count+"人）の回答がそろいました！みんなに連絡しましょう。":ev.count?"いま "+n+" / "+ev.count+"人が回答しています。あと"+(ev.count-n)+"人です。":n?"いま "+n+"人が回答しています。回答が増えると結果が変わります。":"URLを配って、回答を集めましょう。")+'</p>'+
       (ev.count&&n>=ev.count?'<div class="row"><button class="btn sm" id="doneCopy">結果を知らせる文をコピー</button></div>':'')+
       holdInfo(ev)+decideBox(ev,rows)+'</section>';
     h+=shareBox(ev);
   }
   /* 出欠表：行＝候補日、列＝人。行を押すと下にその日のくわしい内容 */
-  var mem0=membersOf(ev),us0=unstar[ev.id]||{};
+  var mem0=membersOf(ev),us0=unstar[ev.id]||{},allIn0=allIn(ev,Object.keys(L).length);
   var list=sortMode==="date"?rows.slice().sort(function(a,b){return a.d<b.d?-1:1}):rows;
   if(!selDate||ev.dates.indexOf(selDate)<0)selDate=rows[0].d;
   h+='<div class="sec-h">出欠表 <small>行を押すと、その日のくわしい内容が出ます</small></div>'+
     '<div class="seg" role="group" aria-label="並べ方" style="align-self:flex-start">'+[["near","全員そろう順"],["date","日付順"]].map(function(x){return '<button data-sort="'+x[0]+'" aria-pressed="'+(sortMode===x[0])+'">'+x[1]+'</button>'}).join("")+'</div>'+
     '<div class="tblwrap boardwrap"><table class="board"><thead><tr><th class="hd">候補日</th><th class="ht">状態</th>'+
     mem0.map(function(n){return '<th class="hn'+(us0[norm(n)]?' off':'')+'"><span>'+esc(n)+'</span></th>'}).join("")+'</tr></thead><tbody>'+
-    list.map(function(r){var t=tierObj(r);
-      return '<tr class="r-'+r.tier+(r.d===selDate?' sel':'')+(ev.decided===r.d?' dec':'')+'" data-row="'+r.d+'"><th class="hd"><button data-row="'+r.d+'">'+dlHtml(r.d)+'</button></th>'+
+    list.map(function(r){var t=tierObj(r),glowRow=!ev.decided&&r.tier==="ok"&&allIn0;
+      return '<tr class="r-'+r.tier+(r.d===selDate?' sel':'')+(ev.decided===r.d||glowRow?' dec':'')+'" data-row="'+r.d+'"><th class="hd"><button data-row="'+r.d+'">'+dlHtml(r.d)+'</button></th>'+
         '<td class="ht"><span class="tmark t-'+r.tier+'">'+t.mark+'<small>'+t.name+'</small></span>'+(isHold(ev,r.d)?'<span class="holdtag">⏸ 調整中</span>':'')+'</td>'+
         mem0.map(function(n){var c=cellOf(ev,L,n,r.d),v=effV(c),m=SYM[v];
           var tip=c?(autoNote(c)+(c.c?(autoNote(c)?"／":"")+c.c:"")):"未回答";
