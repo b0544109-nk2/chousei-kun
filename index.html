@@ -991,7 +991,7 @@ function cellOf(ev,L,name,d){
   if(!r.conf&&(r.v==="o"||r.v==="ka")){var oh=holdOf(ev,name,d);if(oh){r.hold=oh;r.eff="machi";if(!r.until)r.until=oh.deadline||""}}
   return r;
 }
-function allIn(ev,n){return ev.count?n>=ev.count:n>0}
+function allIn(ev,n){return !!ev.count&&n>=ev.count}   /* 人数を決めた募集で、その人数が答えたとき */
 function analyze(ev,skip){
   var L=latest(ev.id),mem=membersOf(ev),us=unstar[ev.id]||{},sk=skip?norm(skip):null;
   return ev.dates.map(function(d){
