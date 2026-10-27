@@ -240,7 +240,13 @@
   .cell.s-none{border-style:dashed;color:#a39f92}
   .cell.off{opacity:.4}
   tr.r-out .cell,tr.r-out td.ht{opacity:.38}
-  tr.dec th.hd button{outline:3px solid var(--mint);outline-offset:1px}
+  table.board tbody tr.dec th.hd button{outline:none;position:relative;border:3px solid transparent;
+    background:linear-gradient(#fff,#fff) padding-box,linear-gradient(90deg,#ff5f6d,#ffc371,#f9f871,#5ee7a0,#4fc3f7,#a18cff,#ff7ad9,#ff5f6d) border-box;
+    background-size:100% 100%,300% 100%;animation:rbborder 3s linear infinite;box-shadow:0 0 14px rgba(161,140,255,.55)}
+  table.board tbody tr.dec th.hd button .dlabel>span:first-child{background:linear-gradient(90deg,#ff5f6d,#ffc371,#5ee7a0,#4fc3f7,#a18cff,#ff7ad9,#ff5f6d);background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:rbtext 3s linear infinite}
+  table.board tbody tr.dec th.hd button .dlabel>span:first-child *{-webkit-text-fill-color:transparent}
+  table.board tbody tr.dec.sel th.hd button .dlabel .tm,table.board tbody tr.dec th.hd button .dlabel .tm{color:var(--muted)}
 
   .dlabel .tm{display:block;font-family:var(--f-body);font-size:.62em;font-weight:700;color:var(--muted);margin-top:3px;white-space:nowrap}
   table.board tr.sel th.hd button .tm{color:#fff}
@@ -464,6 +470,13 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  /* ゲーミング確定日：決まった日付を虹色に流す */
+  .rainbow{background:linear-gradient(90deg,#ff3d6e,#ff9f2e,#f5d300,#2fd38a,#2fb4ff,#8a6bff,#ff4fd8,#ff3d6e);background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+    animation:rbtext 3s linear infinite;filter:drop-shadow(0 0 6px rgba(255,255,255,.9)) drop-shadow(0 0 10px rgba(161,140,255,.55));font-weight:800}
+  @keyframes rbtext{to{background-position:300% 0}}
+  @keyframes rbborder{to{background-position:0 0,300% 0}}
+  @media (prefers-reduced-motion:reduce){.rainbow,tr.dec th.hd button,tr.dec th.hd button .dlabel>span:first-child{animation:none}}
   .done-confirm{display:flex;flex-direction:column;gap:8px;font-size:.8rem;font-weight:700;color:#c0304f;background:#ffe9ee;border-radius:14px;padding:10px 12px;width:100%}
   h1 .cowboy{-webkit-text-fill-color:initial;margin-left:.08em;font-size:.9em}
   .addbox{background:rgba(255,255,255,.5);border:1px solid var(--glass-edge);border-radius:16px;padding:8px 12px}
@@ -896,7 +909,7 @@ function loadExtra(){
   }).catch(function(){renderExtra()});
 }
 function evStatus(e){
-  if(e.decided)return '<span class="xs done">決定 '+esc(dl(e.decided))+'</span>';
+  if(e.decided)return '<span class="xs done">決定 <span class="rainbow">'+esc(dl(e.decided))+'</span></span>';
   var late=e.deadline&&e.deadline<today();
   return '<span class="xs'+(late?' late':'')+'">〆'+(e.deadline?md(e.deadline)+'('+wd(e.deadline)+')':'未定')+(late?' 過ぎ':'')+'</span>';
 }
@@ -1113,7 +1126,7 @@ function copyText(txt,okMsg){
 function renderRes(){
   var ev=cur(),L=latest(ev.id),rows=analyze(ev),h=evHead(ev,L);
   if(ev.decided){
-    h+='<section class="decided"><div class="big">🎉 '+esc(dl(ev.decided))+' に決まりました</div>'+
+    h+='<section class="decided"><div class="big">🎉 <span class="rainbow">'+esc(dl(ev.decided))+'</span> に決まりました</div>'+
       '<div class="row"><button class="btn" id="copyLine">LINE用の文面をコピー</button>'+(isOwner(ev.id)?'<button class="btn sub sm" id="undoDecide">決定を取り消す</button>':'')+'</div></section>';
   }else{
     var best=rows[0],t=tierObj(best);
@@ -1327,7 +1340,7 @@ function applyRef(sg){
 }
 function renderAns(){
   var ev=cur(),L=latest(ev.id),mem=membersOf(ev),h=evHead(ev,L);
-  if(ev.decided)h+='<section class="decided"><div class="big">'+dl(ev.decided)+' に決まっています</div><p class="note" style="color:var(--ink)">回答を直すことはできます。</p></section>';
+  if(ev.decided)h+='<section class="decided"><div class="big"><span class="rainbow">'+esc(dl(ev.decided))+'</span> に決まっています</div><p class="note" style="color:var(--ink)">回答を直すことはできます。</p></section>';
   h+='<section class="panel"><label class="f" for="ansName">お名前<input type="text" id="ansName" list="memList" autocomplete="off" placeholder="例）みお" value="'+esc(draft&&draft.ev===ev.id?draft.name:"")+'"></label>'+
     '<datalist id="memList">'+mem.map(function(n){return '<option value="'+esc(n)+'">'}).join("")+'</datalist>'+
     '<div class="members">'+mem.map(function(n){return '<button class="chipbtn'+(L[norm(n)]?' done':'')+'" data-pick="'+esc(n)+'" aria-pressed="'+(!!draft&&norm(draft.name)===norm(n))+'">'+esc(n)+'</button>'}).join("")+'</div>'+
