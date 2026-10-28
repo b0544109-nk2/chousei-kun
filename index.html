@@ -1171,7 +1171,7 @@ function renderRes(){
   var ev=cur(),L=latest(ev.id),rows=analyze(ev),h=evHead(ev,L);
   if(ev.decided){
     h+='<section class="decided"><div class="big">🎉 <span class="rainbow">'+esc(dl(ev.decided))+'</span> に決まりました</div>'+
-      '<div class="row"><button class="btn" id="copyLine">LINE用の文面をコピー</button>'+(isOwner(ev.id)?'<button class="btn sub sm" id="undoDecide">決定を取り消す</button>':'')+'</div></section>';
+      '<div class="row"><button class="btn" id="copyLine">LINE用の文面をコピー</button><button class="btn sub sm" id="copyResUrl">結果のURLをコピー</button>'+(isOwner(ev.id)?'<button class="btn sub sm" id="undoDecide">決定を取り消す</button>':'')+'</div></section>';
   }else{
     var best=rows[0],t=tierObj(best);
     var okDates=rows.filter(function(r){return r.tier==="ok"}).map(function(r){return dl(r.d)});
@@ -1657,8 +1657,12 @@ document.addEventListener("click",function(e){
     toast(hi>=0?dl(ds.hold)+" の調整中を外しました":dl(ds.hold)+" を調整中にしました（ほかの募集では △待 になります）");return}
   if(ds.decide){if(!isOwner(ev.id))return;ev.decided=ds.decide;confirmDate=null;sendEvent(ev,"決定");render();toast(dl(ds.decide)+" に決めました");return}
   if(b.id==="undoDecide"){if(!isOwner(ev.id))return;ev.decided=null;sendEvent(ev,"決定取り消し");render();toast("決定を取り消しました");return}
+  if(b.id==="copyResUrl"){
+    try{navigator.clipboard.writeText(resultUrl(ev)).then(function(){toast("結果のURLをコピーしました")},function(){toast("コピーできませんでした")})}catch(err){toast("コピーできませんでした")}
+    return;
+  }
   if(b.id==="copyLine"){
-    var txt="【"+ev.title+"】\n"+dl(ev.decided)+" に決まりました！\n"+(ev.memo?ev.memo+"\n":"")+(placeQuery(ev)?"📍 集合場所："+(ev.place||"地図")+"\n"+placeOpen(ev)+"\n":"")+"よろしくお願いします🙌";
+    var txt="【"+ev.title+"】\n"+dl(ev.decided)+" に決まりました！\n"+(ev.memo?ev.memo+"\n":"")+(placeQuery(ev)?"📍 集合場所："+(ev.place||"地図")+"\n"+placeOpen(ev)+"\n":"")+"よろしくお願いします🙌\n\n出欠の結果はこちら👇\n"+resultUrl(ev);
     var ok=function(){toast("コピーしました")};
     try{navigator.clipboard.writeText(txt).then(ok,function(){toast("コピーできませんでした")})}catch(err){toast("コピーできませんでした")}
     return;
