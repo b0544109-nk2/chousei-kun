@@ -470,6 +470,14 @@
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
   .cal button.busy.on{background:var(--grad)}
   .busynote{display:flex;align-items:center;gap:6px;margin:0}
+  .cmbox{min-height:2.6em;resize:vertical}
+  table.board thead th.hn span.has-cm{position:relative;cursor:pointer;padding-right:6px}
+  table.board thead th.hn span.has-cm::after{content:"";position:absolute;right:-2px;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--g2,#ff8fb8);border:1.5px solid #fff}
+  .cmlist ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .cmlist li{display:flex;gap:10px;align-items:baseline;font-size:.9rem;overflow-wrap:anywhere}
+  .cmlist li b{flex:none;font-weight:800;min-width:4.5em}
+  .cmlist li span{white-space:pre-wrap;min-width:0}
+  .who em.cmline{display:block;font-style:normal;color:var(--muted)}
   .place{display:flex;flex-direction:column;gap:8px}
   .place-h{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
   .place-h span{font-size:.78rem;font-weight:800;color:var(--muted)}
@@ -765,7 +773,7 @@ function parseEvents(rows){
 /* 回答タブ：A時刻 B募集ID C名前キー D回答(JSON)。行の順番を新しさとして使う */
 function parseAnswers(rows){
   return rows.map(function(r,i){var j=jparse(r[3]);if(!j||!j.name||!j.a)return null;
-    return {ev:safeId(r[1]),name:String(j.name),ts:i,a:j.a,n:j.n||""}}).filter(Boolean);
+    return {ev:safeId(r[1]),name:String(j.name),ts:i,a:j.a,cm:String(j.cm||""),n:j.n||""}}).filter(Boolean);
 }
 function postForm(f,fields){
   var body=new URLSearchParams();
@@ -779,8 +787,8 @@ function jset(k,v){store(k,JSON.stringify(v))}
 /* 送ったけどまだシートに載っていないもの（見せておく＆送れなかったら送り直す） */
 function pendKey(id){return "sorouhi.pend."+id}
 function pevKey(id){return "sorouhi.pev."+id}
-function sendAnswer(ev,name,a){
-  var p={name:name,a:a,n:nonce(),at:Date.now(),sent:false};
+function sendAnswer(ev,name,a,cm){
+  var p={name:name,a:a,cm:cm||"",n:nonce(),at:Date.now(),sent:false};
   var list=jget(pendKey(ev.id))||[];list.push(p);jset(pendKey(ev.id),list);
   return flushAnswers(ev.id);
 }
@@ -788,7 +796,7 @@ function flushAnswers(id){
   if(DEMO)return Promise.resolve();
   var list=jget(pendKey(id))||[];
   return Promise.all(list.filter(function(p){return !p.sent}).map(function(p){
-    return postForm(CFG.forms.answer,{id:id,key:nameKey(p.name),body:JSON.stringify({name:p.name,a:p.a,n:p.n})})
+    return postForm(CFG.forms.answer,{id:id,key:nameKey(p.name),body:JSON.stringify(p.cm?{name:p.name,a:p.a,cm:p.cm,n:p.n}:{name:p.name,a:p.a,n:p.n})})
       .then(function(){p.sent=true}).catch(function(){})})).then(function(){jset(pendKey(id),list)});
 }
 function sendEvent(ev,kind){
@@ -814,7 +822,7 @@ function mergePending(id,ev){
     var landed=S.answers.some(function(r){return r.ev===id&&r.n===x.n});
     return !landed&&Date.now()-x.at<3*864e5});
   jset(pendKey(id),list);
-  list.forEach(function(x){S.answers.push({ev:id,name:x.name,ts:1e12+x.at,a:x.a,n:x.n})});
+  list.forEach(function(x){S.answers.push({ev:id,name:x.name,ts:1e12+x.at,a:x.a,cm:x.cm||"",n:x.n})});
   return ev;
 }
 /* 幹事として「決める・調整中」を押せる端末：作った端末、幹事用URL、フリカレの鍵が入った端末（＝幹事本人の端末） */
@@ -1030,7 +1038,8 @@ var tipFor=null;
 function showTip(el){
   var t=document.getElementById("tip");if(!t)return;
   var d=el.dataset,v=d.tipv,m=SYM[v]||SYM["-"];
-  t.innerHTML='<div class="tip-h">'+symHtml(v)+'<b>'+esc(d.tipn)+'</b><span>'+esc(dl(d.tipd))+'</span></div>'+
+  if(d.tipcm!=null)t.innerHTML='<div class="tip-h"><b>📝 '+esc(d.tipn)+'</b></div><div class="tip-c" style="white-space:pre-wrap">'+esc(d.tipcm)+'</div>';
+  else t.innerHTML='<div class="tip-h">'+symHtml(v)+'<b>'+esc(d.tipn)+'</b><span>'+esc(dl(d.tipd))+'</span></div>'+
     '<div class="tip-b">'+esc(m.label)+(d.tipu?'<em>（'+esc(md(d.tipu))+'までに分かる）</em>':'')+'</div>'+
     (d.tipc&&d.tipc!=="未回答"?'<div class="tip-c">'+esc(d.tipc)+'</div>':'');
   t.hidden=false;tipFor=el;
@@ -1040,10 +1049,10 @@ function showTip(el){
   t.style.left=x+"px";t.style.top=y+"px";
 }
 function hideTip(){var t=document.getElementById("tip");if(t)t.hidden=true;tipFor=null}
-document.addEventListener("pointerover",function(e){if(e.pointerType!=="mouse")return;var c=e.target.closest&&e.target.closest(".cell[data-tipn]");if(c&&c!==tipFor)showTip(c)});
+document.addEventListener("pointerover",function(e){if(e.pointerType!=="mouse")return;var c=e.target.closest&&e.target.closest(".cell[data-tipn],.has-cm[data-tipn]");if(c&&c!==tipFor)showTip(c)});
 document.addEventListener("pointerout",function(e){if(e.pointerType!=="mouse"||!tipFor)return;var to=e.relatedTarget;if(!to||!tipFor.contains(to))hideTip()});
-document.addEventListener("click",function(e){var c=e.target.closest&&e.target.closest(".cell[data-tipn]");if(c){if(c===tipFor&&e.pointerType!=="mouse")hideTip();else showTip(c);return}if(tipFor)hideTip()});
-document.addEventListener("keydown",function(e){var c=e.target.closest&&e.target.closest(".cell[data-tipn]");if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();showTip(c)}else if(e.key==="Escape")hideTip()});
+document.addEventListener("click",function(e){var c=e.target.closest&&e.target.closest(".cell[data-tipn],.has-cm[data-tipn]");if(c){if(c===tipFor&&e.pointerType!=="mouse")hideTip();else showTip(c);return}if(tipFor)hideTip()});
+document.addEventListener("keydown",function(e){var c=e.target.closest&&e.target.closest(".cell[data-tipn],.has-cm[data-tipn]");if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();showTip(c)}else if(e.key==="Escape")hideTip()});
 window.addEventListener("scroll",hideTip,{passive:true});
 document.addEventListener("scroll",function(e){if(e.target&&e.target.classList&&e.target.classList.contains("boardwrap"))hideTip()},true);
 
@@ -1189,7 +1198,8 @@ function renderRes(){
   h+='<div class="sec-h">出欠表 <small>行を押すと、その日のくわしい内容が出ます</small></div>'+
     '<div class="seg" role="group" aria-label="並べ方" style="align-self:flex-start">'+[["near","全員そろう順"],["date","日付順"]].map(function(x){return '<button data-sort="'+x[0]+'" aria-pressed="'+(sortMode===x[0])+'">'+x[1]+'</button>'}).join("")+'</div>'+
     '<div class="tblwrap boardwrap"><table class="board"><thead><tr><th class="hd">候補日</th><th class="ht">状態</th>'+
-    mem0.map(function(n){return '<th class="hn'+(us0[norm(n)]?' off':'')+'"><span>'+esc(n)+'</span></th>'}).join("")+'</tr></thead><tbody>'+
+    mem0.map(function(n){var cm=(L[norm(n)]||{}).cm||"";
+      return '<th class="hn'+(us0[norm(n)]?' off':'')+'"><span'+(cm?' class="has-cm" tabindex="0" role="button" data-tipn="'+esc(n)+'" data-tipcm="'+esc(cm)+'"':'')+'>'+esc(n)+'</span></th>'}).join("")+'</tr></thead><tbody>'+
     list.map(function(r){var t=tierObj(r),glowRow=!ev.decided&&r.tier==="ok"&&allIn0;
       return '<tr class="r-'+r.tier+(r.d===selDate?' sel':'')+(ev.decided===r.d||glowRow?' dec':'')+'" data-row="'+r.d+'"><th class="hd"><button data-row="'+r.d+'">'+dlHtml(r.d)+'</button></th>'+
         '<td class="ht"><span class="tmark t-'+r.tier+'">'+t.mark+'<small>'+t.name+'</small></span>'+(isHold(ev,r.d)?'<span class="holdtag">⏸ 調整中</span>':'')+'</td>'+
@@ -1197,7 +1207,10 @@ function renderRes(){
           var tip=c?(autoNote(c)+(c.c?(autoNote(c)?"／":"")+c.c:"")):"未回答";
           return '<td class="cw"><span class="cell s-'+(v==="-"?"none":v)+(us0[norm(n)]?' off':'')+((c&&(c.c||c.conf||c.hold))?' has-c':'')+'" tabindex="0" role="button" data-tipn="'+esc(n)+'" data-tipv="'+v+'" data-tipc="'+esc(tip)+'" data-tipu="'+esc(v==="machi"&&c&&c.until?c.until:"")+'" data-tipd="'+esc(r.d)+'">'+
             '<b>'+m.g+'</b>'+(m.sub?'<i>'+m.sub+'</i>':'')+(c&&c.conf?'<em>⚠</em>':c&&c.hold?'<em>⏸</em>':'')+'</span>'+untilTag(c,v)+'</td>'}).join("")+'</tr>'}).join("")+
-    '</tbody></table></div><p class="note">右上の点はひとことあり、⚠× は別の募集がその日に決まったので自動で × にした人です。✕ の行は来られない人がいる日です。</p>';
+    '</tbody></table></div><p class="note">右上の点はひとことあり（名前の点はコメントあり）、⚠× は別の募集がその日に決まったので自動で × にした人です。✕ の行は来られない人がいる日です。</p>';
+  var cms=mem0.filter(function(n){return (L[norm(n)]||{}).cm});
+  if(cms.length)h+='<section class="panel cmlist"><div class="sec-h" style="margin:0">📝 コメント</div><ul>'+
+    cms.map(function(n){return '<li><b>'+esc(n)+'</b><span>'+linkify(L[norm(n)].cm)+'</span></li>'}).join("")+'</ul></section>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
   if(isOwner(ev.id))h+=orgMenu(ev);
@@ -1310,10 +1323,11 @@ function card(ev,r){
   var list=[].concat(g.x,g.kiken,g.machi,g.ka);
   var h='<article class="dcard t-'+r.tier+'"><div class="dhead">'+dlHtml(r.d)+'<span class="tier">'+t.mark+' '+t.name+'</span></div>'+
     '<p class="tdesc">'+desc+'</p>';
-  if(list.length)h+='<ul class="who">'+list.map(function(x){var c=x.c;
+  var LL=latest(ev.id);
+  if(list.length)h+='<ul class="who">'+list.map(function(x){var c=x.c,cm=(LL[norm(x.n)]||{}).cm;
     var note=autoNote(c)?autoNote(c)+(c.c?"／"+c.c:""):c.c;
     if((c.v==="machi"||c.hold)&&c.until&&!c.conf)note=(note?note+"・":"")+md(c.until)+"に分かる";
-    return '<li>'+symHtml(effV(c))+'<span class="nm">'+esc(x.n)+'</span>'+(c.conf?'<span class="chip warn">⚠ 別の予定</span>':c.hold?'<span class="chip hold">⏸ 別の募集で調整中</span>':'')+(note?'<em>'+esc(note)+'</em>':'')+'</li>'}).join("")+'</ul>';
+    return '<li>'+symHtml(effV(c))+'<span class="nm">'+esc(x.n)+'</span>'+(c.conf?'<span class="chip warn">⚠ 別の予定</span>':c.hold?'<span class="chip hold">⏸ 別の募集で調整中</span>':'')+(note?'<em>'+esc(note)+'</em>':'')+(cm?'<em class="cmline">📝 '+esc(cm)+'</em>':'')+'</li>'}).join("")+'</ul>';
   var foot=[];
   if(g.o.length)foot.push('○ <b>'+g.o.length+'人</b>：'+names(g.o));
   if(g.none.length)foot.push('回答まだ：'+names(g.none));
@@ -1357,14 +1371,14 @@ function suggestions(ev,name){
 function newDraft(ev,name){
   var a=latest(ev.id)[norm(name)],rows={};
   ev.dates.forEach(function(d){var c=a&&a.a[d];rows[d]={v:c?c.v:"-",c:c&&c.c||"",until:c&&c.until||"",open:!!(c&&c.c)}});
-  return {ev:ev.id,name:name,rows:rows,loaded:!!a,refAsk:null,refDone:false,target:"all"};
+  return {ev:ev.id,name:name,rows:rows,cm:a&&a.cm||"",loaded:!!a,refAsk:null,refDone:false,target:"all"};
 }
 function setName(name){
   var ev=cur();name=String(name||"").trim();
   var prev=draft&&draft.ev===ev.id?draft:null;
   if(!name){if(prev){prev.name="";prev.loaded=false}else draft=newDraft(ev,"");render();return}
   draft=newDraft(ev,name);
-  if(!draft.loaded&&prev){draft.rows=prev.rows;draft.target=prev.target}
+  if(!draft.loaded&&prev){draft.rows=prev.rows;draft.target=prev.target;draft.cm=prev.cm}
   store(MYNAME,name);
   setTimeout(loadExtra,0);
   offerRef(ev);render();
@@ -1392,9 +1406,11 @@ function renderAns(){
   h+='<section class="panel"><label class="f" for="ansName">お名前<input type="text" id="ansName" list="memList" autocomplete="off" placeholder="例）みお" value="'+esc(draft&&draft.ev===ev.id?draft.name:"")+'"></label>'+
     '<datalist id="memList">'+mem.map(function(n){return '<option value="'+esc(n)+'">'}).join("")+'</datalist>'+
     '<div class="members">'+mem.map(function(n){return '<button class="chipbtn'+(L[norm(n)]?' done':'')+'" data-pick="'+esc(n)+'" aria-pressed="'+(!!draft&&norm(draft.name)===norm(n))+'">'+esc(n)+'</button>'}).join("")+'</div>'+
-    '<p class="note">初めての人は名前を入れてください。回答ずみの人は、上の名前を押すと前の回答を読みこんで直せます。</p></section>';
+    '<p class="note">初めての人は名前を入れてください。回答ずみの人は、上の名前を押すと前の回答を読みこんで直せます。</p>';
   /* 名前を入れる前から候補日を出す（名前が空の下書き。送るときに名前を確認する） */
   if(!draft||draft.ev!==ev.id)draft=newDraft(ev,"");
+  /* コメント：日付に関係なく、全体にかかる自由欄 */
+  h+='<label class="f" for="ansCm">コメント（任意）<textarea id="ansCm" class="cmbox" maxlength="200" rows="2">'+esc(draft.cm||"")+'</textarea></label></section>';
   if(draft.refAsk){
     var sg=draft.refAsk,ds=Object.keys(sg.map).sort();
     h+='<section class="refbox"><p class="q">'+esc(draft.name)+'さん、他の募集で同じ日に答えた ○△× があります（'+sg.src.length+'件）。重なる日（'+ds.map(dl).join("・")+'）に同じ内容を入れますか？</p><ul>'+
@@ -1700,8 +1716,9 @@ document.addEventListener("click",function(e){
     }
     var a={};Object.keys(draft.rows).forEach(function(d){var r=draft.rows[d];a[d]={v:r.v};if(r.c)a[d].c=r.c;if(r.v==="machi"&&r.until)a[d].until=r.until});
     var before=Object.keys(latest(ev.id)).length;
-    if(DEMO)S.answers.push({ev:ev.id,name:draft.name,ts:Date.now(),a:a});
-    else{sendAnswer(ev,draft.name,a);recordJoined(ev,draft.name);S.answers.push({ev:ev.id,name:draft.name,ts:1e12+Date.now(),a:a,n:"(local)"})}
+    var cmv=String(draft.cm||"").trim().slice(0,200);
+    if(DEMO)S.answers.push({ev:ev.id,name:draft.name,ts:Date.now(),a:a,cm:cmv});
+    else{sendAnswer(ev,draft.name,a,cmv);recordJoined(ev,draft.name);S.answers.push({ev:ev.id,name:draft.name,ts:1e12+Date.now(),a:a,cm:cmv,n:"(local)"})}
     var after=Object.keys(latest(ev.id)).length,last=ev.count&&before<ev.count&&after>=ev.count;
     var sentName=draft.name;
     toast(draft.name+"さんの回答を送りました");draft=null;tab="res";render();window.scrollTo({top:0});
@@ -1749,6 +1766,7 @@ document.addEventListener("input",function(e){
   if(t.dataset.tday){nd.dates[t.dataset.tday][+t.dataset.ti]=t.value;return}
   if(t.id==="nPlace"||t.id==="emPlace"){previewMap(t.id+"Prev",t.value);return}
   if(!draft)return;
+  if(t.id==="ansCm"){draft.cm=t.value;return}
   if(t.dataset.cmin){var r=draft.rows[t.dataset.cmin];r.c=t.value;if(r.ref){r.ref=null}}
   if(t.dataset.until){draft.rows[t.dataset.until].until=t.value}
 });
