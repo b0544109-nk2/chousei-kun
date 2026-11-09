@@ -464,7 +464,7 @@
   .share details.fold{box-shadow:none;background:rgba(255,255,255,.45)}
   .share details.fold input{margin-top:6px;font-size:.8rem}
   .note a{color:#6a55f0;font-weight:700}
-  .far{display:flex;flex-direction:column;gap:8px}
+  .addmonth{align-self:flex-start}
   /* フリカレに予定がある日：右上に小さい点＋うすい色 */
   .cal button.busy{position:relative;background:rgba(255,179,107,.22)}
   .cal button.busy::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#ff9d4d}
@@ -570,7 +570,6 @@
   .busynote i{display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(255,179,107,.35);position:relative;flex:none}
   .busynote i::after{content:"";position:absolute;top:1px;right:1px;width:5px;height:5px;border-radius:50%;background:#ff9d4d}
   .busytxt{font-size:.74rem;font-weight:700;color:#b5651d;background:rgba(255,179,107,.18);border-radius:10px;padding:2px 8px;min-width:0;overflow-wrap:anywhere}
-  .far select{border:1px solid rgba(139,123,255,.35);border-radius:14px;background:rgba(255,255,255,.85);padding:8px 12px;font-size:.95rem;max-width:16rem}
   /* 名前の候補：回答ずみ（✓）でも、選んでいるものはグラデーションに */
   .members .chipbtn.done[aria-pressed="true"]{background:var(--grad);color:#fff}
   .members .chipbtn.done[aria-pressed="true"]::after{color:#fff}
@@ -1264,8 +1263,7 @@ function orgMenu(ev){
     '<div class="f">候補日を消す <span class="note" style="display:inline">消したい日にチェック</span></div><div class="emlist">'+rows+'</div>'+
     '<details class="addbox" id="emAdd"><summary>＋ 候補日を足す</summary>'+
     '<p class="note">足したい月を開いて、日付をタップ（点線の日はもう候補にある日）</p>'+
-    '<div class="calfolds" id="cals">'+(function(){var t=new Date(),h2="";for(var i=0;i<CAL_FIRST;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);
-      h2+='<details class="calfold"><summary>'+m.getFullYear()+'年 '+(m.getMonth()+1)+'月</summary>'+calHtml(m)+'</details>'}return h2})()+'</div>'+farPicker()+
+    '<div class="calfolds" id="cals">'+(function(){var h2="";for(var i=0;i<CAL_FIRST+extraMonths;i++)h2+=calFold(monthAt(i),i>=CAL_FIRST);return h2})()+'</div>'+farPicker()+
     '<label class="f" for="nTime">足す日の時刻<input type="text" id="nTime" list="timeList" value="'+esc(commonTime(ev))+'"></label>'+
     '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
     '<div class="row"><button class="btn sub sm" data-tall="1">選んだ日を全部この時刻にする</button></div>'+
@@ -1295,7 +1293,7 @@ function emSave(ev){
   ev.holding=(ev.holding||[]).filter(function(d){return ev.dates.indexOf(d)>=0});
   if(ev.decided&&ev.dates.indexOf(ev.decided)<0)ev.decided=null;
   if(selDate&&ev.dates.indexOf(selDate)<0)selDate=null;
-  emAdds=[];orgMenuOpen=false;nd={dates:{},drag:null};farMonth="";
+  emAdds=[];orgMenuOpen=false;nd={dates:{},drag:null};extraMonths=0;
   sendEvent(ev,"編集");render();
   var nDel=Object.keys(del).length;
   toast("保存しました"+(nDel||added?"（"+(added?"候補を"+added+"件足しました":"")+(added&&nDel?"・":"")+(nDel?nDel+"件消しました":"")+"）":""));
@@ -1506,14 +1504,14 @@ function loadBusy(){
   }).catch(function(){});
 }
 /* カレンダーは半年分を常に出す。その先（2年後まで）はプルダウンで月を選ぶと、その月のカレンダーが出る */
-var CAL_FIRST=6, calMonths=CAL_FIRST, farMonth="";
+var CAL_FIRST=6, CAL_MAX=24, calMonths=CAL_FIRST, extraMonths=0;
+function calFold(m,open){return '<details class="calfold"'+(open?' open':'')+'><summary>'+monthLabel(m)+'</summary>'+calHtml(m)+'</details>'}
+function monthAt(i){var t=new Date();return new Date(t.getFullYear(),t.getMonth()+i,1)}
+function monthLabel(m){return m.getFullYear()+'年 '+(m.getMonth()+1)+'月'}
 function farPicker(){
-  var t=new Date(),o='<option value="">その先の月をえらぶ…</option>';
-  for(var i=CAL_FIRST;i<24;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1),v=m.getFullYear()+"-"+(m.getMonth()+1);
-    o+='<option value="'+v+'"'+(v===farMonth?' selected':'')+'>'+m.getFullYear()+'年 '+(m.getMonth()+1)+'月</option>'}
-  var shown="";if(farMonth){var a=farMonth.split("-");shown=calHtml(new Date(+a[0],a[1]-1,1))}
-  return '<div class="far"><label class="f" for="farPick" style="font-size:.8rem">半年より先の候補日<select id="farPick">'+o+'</select></label>'+
-    '<div class="cals" id="farCal">'+shown+'</div></div>';
+  var n=CAL_FIRST+extraMonths;
+  if(n>=CAL_MAX)return '<p class="note">2年先まで出しています</p>';
+  return '<button class="btn sub sm addmonth" id="addMonth">＋ '+monthLabel(monthAt(n))+' を足す</button>';
 }
 function renderNew(){
   EDIT_HAVE=null;   /* 幹事メニューの「もう候補にある日」の印は作成画面では使わない */
@@ -1527,7 +1525,7 @@ function renderNew(){
     '<label class="f" for="nPlaceUrl">Googleマップのリンク（任意）<input type="url" id="nPlaceUrl" placeholder="https://maps.app.goo.gl/…"></label>'+
     '<p class="note" style="margin-top:-6px">地図は場所名・住所から出します。違う場所が出たら、住所や「駅名＋出口」のように書き直してください。リンクを入れると「地図アプリで開く」ボタンになります。</p>'+
     '<div class="f" style="font-weight:700;font-size:.86rem">候補日 <span class="note" style="display:inline">日付をタップ。なぞるとまとめて選べます</span></div><div class="copybox" id="copyBox"></div><p class="note busynote" id="busyNote"'+(BUSY?'':' hidden')+'><i></i>の日はフリカレに予定がある日です（この端末にだけ表示）</p><div class="cals" id="cals">';
-  for(var i=0;i<calMonths;i++){var m=new Date(t.getFullYear(),t.getMonth()+i,1);h+=calHtml(m)}
+  for(var i=0;i<calMonths+extraMonths;i++)h+=calHtml(monthAt(i));
   h+='</div>'+farPicker()+'<label class="f" for="nTime">はじめに入る時刻<input type="text" id="nTime" list="timeList" value="19:00〜"></label>'+
     '<datalist id="timeList">'+["11:00〜","12:00〜（ランチ）","13:00〜","15:00〜","18:00〜","18:30〜","19:00〜","19:30〜","終日","時間未定"].map(function(t){return '<option value="'+t+'">'}).join("")+'</datalist>'+
     '<div class="row"><button class="btn sub sm" data-tall="1">選んだ日を全部この時刻にする</button></div>'+
@@ -1685,6 +1683,10 @@ document.addEventListener("click",function(e){
     try{navigator.clipboard.writeText(txt).then(ok,function(){toast("コピーできませんでした")})}catch(err){toast("コピーできませんでした")}
     return;
   }
+  if(b.id==="addMonth"){var box=document.getElementById("cals");if(!box)return;
+    var m=monthAt(CAL_FIRST+extraMonths);extraMonths++;
+    box.insertAdjacentHTML("beforeend",box.classList.contains("calfolds")?calFold(m,true):calHtml(m));
+    b.outerHTML=farPicker();refreshPicked();return}
   if(b.id==="copyDates"){var sel=document.getElementById("copyFrom");if(sel)copyDatesFrom(sel.value);return}
   if(b.id==="clearDates"){nd.dates={};refreshPicked();fillCopyBox();toast("選んだ候補日を消しました");return}
   if(ds.tall){var t0=defTime();Object.keys(nd.dates).forEach(function(d){nd.dates[d]=[t0]});refreshPicked();return}
@@ -1773,12 +1775,6 @@ document.addEventListener("input",function(e){
   if(t.dataset.until){draft.rows[t.dataset.until].until=t.value}
 });
 document.addEventListener("change",function(e){if(e.target.id==="ansName")setName(e.target.value)});
-document.addEventListener("change",function(e){
-  if(e.target.id!=="farPick")return;
-  farMonth=e.target.value;var box=document.getElementById("farCal");if(!box)return;
-  if(!farMonth){box.innerHTML="";return}
-  var a=farMonth.split("-");box.innerHTML=calHtml(new Date(+a[0],a[1]-1,1));refreshPicked();
-});
 document.addEventListener("keydown",function(e){if(e.target.id==="ansName"&&e.key==="Enter"){e.preventDefault();setName(e.target.value)}});
 
 /* カレンダー：タップで切りかえ、なぞって範囲 */
