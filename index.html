@@ -1777,21 +1777,34 @@ document.addEventListener("input",function(e){
 document.addEventListener("change",function(e){if(e.target.id==="ansName")setName(e.target.value)});
 document.addEventListener("keydown",function(e){if(e.target.id==="ansName"&&e.key==="Enter"){e.preventDefault();setName(e.target.value)}});
 
-/* カレンダー：タップで切りかえ、なぞって範囲 */
+/* カレンダー：タップで切りかえ、なぞって範囲。
+   マウスは押した瞬間に切りかえる。指は離したときに決める：縦に動いたらスクロールなので何もしない
+   （押した瞬間に切りかえると、カレンダーの上からスクロールし始めただけで日付が選ばれてしまう）。
+   指を横になぞったときだけ範囲選択にする（.cal は touch-action:pan-y なので横の動きはスクロールにならない） */
+var calTouch=null;
+function calSet(b,on){var k=b.dataset.day;if(on){if(!nd.dates[k])nd.dates[k]=[defTime()]}else delete nd.dates[k]}
 document.addEventListener("pointerdown",function(e){
   var b=e.target.closest(".cal button[data-day]");if(!b||b.disabled)return;
-  e.preventDefault();var on=!nd.dates[b.dataset.day];nd.drag=on;
-  if(on)nd.dates[b.dataset.day]=[defTime()];else delete nd.dates[b.dataset.day];refreshPicked();
+  if(e.pointerType==="touch"){calTouch={b:b,x:e.clientX,y:e.clientY};return}
+  e.preventDefault();var on=!nd.dates[b.dataset.day];nd.drag=on;calSet(b,on);refreshPicked();
 });
 function defTime(){var i=document.getElementById("nTime");return i?i.value.trim():""}
 document.addEventListener("pointermove",function(e){
+  if(calTouch&&nd.drag==null){var dx=Math.abs(e.clientX-calTouch.x),dy=Math.abs(e.clientY-calTouch.y);
+    if(dy>10&&dy>=dx){calTouch=null;return}   /* 縦：スクロール */
+    if(dx<=10)return;
+    var on=!nd.dates[calTouch.b.dataset.day];nd.drag=on;calSet(calTouch.b,on);calTouch=null;refreshPicked()}   /* 横：なぞり始め */
   if(nd.drag==null)return;
   var el=document.elementFromPoint(e.clientX,e.clientY),b=el&&el.closest&&el.closest(".cal button[data-day]");
   if(!b||b.disabled)return;
-  var k=b.dataset.day;if(nd.drag){if(!nd.dates[k])nd.dates[k]=[defTime()]}else delete nd.dates[k];refreshPicked();
+  calSet(b,nd.drag);refreshPicked();
 });
-document.addEventListener("pointerup",function(){nd.drag=null});
-document.addEventListener("pointercancel",function(){nd.drag=null});
+document.addEventListener("pointerup",function(e){
+  if(calTouch&&nd.drag==null){var b=calTouch.b,calTouch0=calTouch;calTouch=null;
+    if(b.isConnected&&Math.abs(e.clientX-calTouch0.x)<=10&&Math.abs(e.clientY-calTouch0.y)<=10){calSet(b,!nd.dates[b.dataset.day]);refreshPicked()}}
+  nd.drag=null;calTouch=null;
+});
+document.addEventListener("pointercancel",function(){nd.drag=null;calTouch=null});
 
 render();
 if(EID&&READY&&!DEMO)refresh();
