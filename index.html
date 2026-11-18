@@ -1685,7 +1685,7 @@ function renderState(){
 function renderTop(){
   var mine=(jget(MINE)||[]).slice().reverse();
   var h=renderNew();
-  h+='<p class="note" style="text-align:center"><a href="?admin">📋 幹事ダッシュボード（自分の募集を一覧で見る）</a></p>';
+  if(!DEMO&&(mine.length||isBoss()))h+='<p class="note" style="text-align:center"><a href="?admin">📋 幹事ダッシュボード（自分の募集を一覧で見る）</a></p>';
   if(mine.length&&!DEMO)h+='<details class="fold"><summary>この端末で作った募集（'+mine.length+'）</summary><div class="stars" style="flex-direction:column;align-items:stretch">'+
     mine.map(function(m){return '<a class="btn sub sm" style="text-align:left" href="'+esc(BASE+"?e="+m.id)+'">'+esc(m.title)+'　<small>〆'+md(m.deadline)+'</small></a>'}).join("")+
     '</div><p class="note">ほかの人には見えません。この端末のブラウザにだけ残っています。</p></details>';
