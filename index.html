@@ -444,6 +444,14 @@
   .xs.done{background:rgba(126,226,176,.45);color:#1f6a46}
   .xs.late{background:#ffe0e6;color:#c0304f}
   .xs.other{background:rgba(143,208,255,.3);color:#2f78b7}
+  .adm-list li.adm{flex-direction:column;align-items:stretch;gap:4px}
+  .adm-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .adm-m{display:flex;flex-wrap:wrap;gap:6px}
+  .adm-b{font-size:.72rem;font-weight:800;border-radius:999px;padding:2px 10px;background:rgba(255,255,255,.85);color:var(--muted);white-space:nowrap}
+  .adm-ok .adm-b{background:rgba(126,226,176,.55);color:#1f6a46}
+  .adm-ask .adm-b{background:#fff0c2;color:#8a6200}
+  .adm-hard .adm-b{background:#ffe0e6;color:#c0304f}
+  .xs.best{background:rgba(139,123,255,.18);color:var(--ink)}
   td.cw{vertical-align:top}
   .cell[data-tipn]{cursor:pointer}
   .cell[data-tipn]:focus-visible{outline:3px solid var(--g1);outline-offset:2px}
@@ -734,7 +742,8 @@ function save(){}
 /* 配った回答用URL（e/<ID>/、または転送後の ?e=<ID>&a）で開いたら、回答タブから始める。
    幹事が作った直後や ?e=<ID> で開いたときは結果タブ */
 var OPEN_ANS=(!!PATH_ID||Q.has("a"))&&!Q.has("r");   /* ?r（「結果はこちら」のリンク）なら結果タブ */
-var tab=EID&&OPEN_ANS?"ans":EID||DEMO?"res":"new", unstar={}, draft=null, confirmDate=null, sortMode="near", selDate=null;
+var ADMIN=Q.has("admin")&&!EID;   /* 幹事ダッシュボード */
+var tab=ADMIN?"admin":EID&&OPEN_ANS?"ans":EID||DEMO?"res":"new", unstar={}, draft=null, confirmDate=null, sortMode="near", selDate=null;
 var loaded=DEMO, loadErr="", firstLoad=true;
 function cur(){return S.events.filter(function(e){return e.id===S.cur})[0]||(DEMO?S.events[0]:null)}
 function evById(id){return S.events.filter(function(e){return e.id===id})[0]}
@@ -875,7 +884,9 @@ function loadForeign(namesList){
 /* 自動更新：30秒＋ずらし。画面に戻ったときはすぐ読む */
 var pollT=null,lastLoad=0;
 function refresh(){
-  if(DEMO||!EID||!READY)return;
+  if(DEMO||!READY)return;
+  if(tab==="admin"){lastLoad=Date.now();loadAdmin().then(render).then(schedule,schedule);return}
+  if(!EID)return;
   lastLoad=Date.now();
   loadMain().then(function(){
     var ev=cur();
@@ -907,7 +918,7 @@ function joinedFor(name){
   return (jget(JOINED)||[]).filter(function(j){return norm(j.name)===k&&j.id!==EID}).reverse();
 }
 function loadExtra(){
-  if(DEMO||!READY)return;
+  if(DEMO||!READY||tab==="admin")return;
   if(isBoss()){
     if(Date.now()-extraAt<20000&&allEvents){renderExtra();return}
     extraAt=Date.now();
@@ -932,6 +943,7 @@ function evStatus(e){
 }
 function renderExtra(){
   var box=document.getElementById("extra");if(!box)return;
+  if(tab==="admin"){box.hidden=true;return}
   var h="";
   if(isBoss()&&allEvents){
     var mine={};(jget(MINE)||[]).forEach(function(m){mine[m.id]=1});
@@ -952,6 +964,63 @@ function renderExtra(){
   }
   box.innerHTML=h;box.hidden=!h;
   if(tab==="new")fillCopyBox();
+}
+/* ================= 幹事ダッシュボード（?admin） =================
+   シートの募集と回答をぜんぶ読み、募集ごとに「決められる／要調整／結果待ち／厳しい／回答待ち」に分けて、
+   手を付けるべき順に並べる。幹事の名前が自分の募集だけ（名前が未設定なら全部）。「すべて」で全員分も見られる */
+var admFilter=store(MYNAME)?"mine":"all", admLoaded=DEMO, admErr="";
+function loadAdmin(){
+  if(DEMO||!READY)return Promise.resolve();
+  return Promise.all([gviz("募集"),gviz("回答")]).then(function(r){
+    var evs=parseEvents(r[0]);
+    S.events=Object.keys(evs).map(function(id){return evs[id]});
+    S.answers=parseAnswers(r[1]);
+    admLoaded=true;admErr="";
+  }).catch(function(err){admErr=String(err&&err.message||err)});
+}
+var ADM={
+  ok:{mark:"◎",name:"決められる",ord:0},ask:{mark:"○",name:"要調整",ord:1},pend:{mark:"⏳",name:"結果待ち",ord:2},
+  hard:{mark:"⚠",name:"厳しい",ord:3},wait:{mark:"…",name:"回答待ち",ord:4},done:{mark:"✓",name:"決定済み",ord:5}
+};
+function admInfo(ev){
+  var n=Object.keys(latest(ev.id)).length,best=n?analyze(ev)[0]:null,st;
+  if(ev.decided)st="done";
+  else if(!n||(ev.count&&n<ev.count))st="wait";
+  else st=best.tier==="ok"?"ok":best.tier==="ask"?"ask":best.tier==="wait"?"pend":"hard";
+  return {ev:ev,n:n,best:best,st:st,late:!!ev.deadline&&ev.deadline<today()&&!ev.decided};
+}
+function admRow(x){
+  var ev=x.ev,a=ADM[x.st],b=x.best,g=b&&b.g;
+  var cnt='回答 '+x.n+(ev.count?'/'+ev.count:'')+'人'+(ev.count&&x.n<ev.count?'（あと'+(ev.count-x.n)+'人）':'');
+  var h='<li class="adm adm-'+x.st+'"><div class="adm-h"><span class="adm-b">'+a.mark+' '+a.name+'</span>'+
+    '<a href="'+esc(BASE+"?e="+ev.id+"&r")+'">'+esc(ev.title)+'</a></div><div class="adm-m">'+
+    '<span class="xs">'+cnt+'</span>'+evStatus(ev);
+  if(x.st!=="done"&&x.st!=="wait"&&b&&g)
+    h+='<span class="xs best">最有力 '+esc(dl(b.d))+'　○'+g.o.length+(g.ka.length?' △可'+g.ka.length:'')+(g.machi.length?' △待'+g.machi.length:'')+(g.kiken.length?' △危'+g.kiken.length:'')+(g.x.length?' ×'+g.x.length:'')+'</span>';
+  if(x.st==="ok"&&!ev.count)h+='<span class="xs">人数が未設定なので、いま答えた人の中で全員○</span>';
+  if(x.late&&x.st==="wait")h+='<span class="xs late">〆切を過ぎても回答待ち</span>';
+  return h+'</div></li>';
+}
+function renderAdmin(){
+  document.title="幹事ダッシュボード｜調整くんっ！🤠";
+  if(!READY)return renderState();
+  if(!admLoaded&&!admErr)return '<section class="panel"><p class="note" style="font-size:.9rem">読みこみ中…</p></section>';
+  if(admErr&&!S.events.length)return '<section class="panel"><div class="sec-h" style="margin:0">読みこめませんでした</div>'+
+    '<p class="note">電波のよいところで開き直してください。（'+esc(admErr)+'）</p><div><button class="btn sm" id="retry">もう一度読む</button></div></section>';
+  var my=store(MYNAME),mineOnly=admFilter==="mine";
+  var list=S.events.filter(function(e){return !mineOnly||isMyEvent(e)}).map(admInfo);
+  list.sort(function(a,b){return ADM[a.st].ord-ADM[b.st].ord||(a.st==="done"?((a.ev.decided<b.ev.decided)?1:-1):((a.ev.deadline||"9")<(b.ev.deadline||"9")?-1:1))});
+  var open=list.filter(function(x){return x.st!=="done"}),done=list.filter(function(x){return x.st==="done"});
+  var cnt={};open.forEach(function(x){cnt[x.st]=(cnt[x.st]||0)+1});
+  var h='<section class="panel"><div class="sec-h" style="margin:0">📋 幹事ダッシュボード</div>'+
+    '<div class="stars" style="margin-top:8px"><button class="chipbtn" data-adm="mine" aria-pressed="'+mineOnly+'">自分の募集</button>'+
+    '<button class="chipbtn" data-adm="all" aria-pressed="'+!mineOnly+'">すべて</button></div>'+
+    (mineOnly&&!my?'<p class="note">名前が未設定の端末では、幹事の名前が入っていない募集だけ出ます。</p>':'')+
+    '<p class="note">'+(open.length?'調整中 '+open.length+'件：'+["ok","ask","pend","hard","wait"].filter(function(k){return cnt[k]}).map(function(k){return ADM[k].name+' '+cnt[k]}).join('・'):'調整中の募集はありません')+'</p>';
+  if(open.length)h+='<ul class="xlist adm-list">'+open.map(admRow).join("")+'</ul>';
+  h+='</section>';
+  if(done.length)h+='<details class="fold xbox"><summary>決定済み（'+done.length+'）</summary><ul class="xlist adm-list">'+done.map(admRow).join("")+'</ul></details>';
+  return h;
 }
 function schedule(){clearTimeout(pollT);pollT=setTimeout(function(){if(document.hidden){schedule();return}refresh()},30000+Math.random()*8000)}
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&Date.now()-lastLoad>10000)refresh()});
@@ -1065,7 +1134,7 @@ function renderBar(){
   document.getElementById("demoNote").hidden=!DEMO;
   if(DEMO)document.getElementById("demoSw").innerHTML=S.events.map(function(e,i){
     return '<button class="chipbtn" data-ev="'+e.id+'" aria-pressed="'+(e.id===S.cur&&tab!=="new")+'">見本'+(i+1)+'</button>'}).join("");
-  document.getElementById("tabs").hidden=tab==="new"||!cur();
+  document.getElementById("tabs").hidden=tab==="new"||tab==="admin"||!cur();
   document.getElementById("goNew").hidden=tab==="new";
   document.getElementById("tabRes").setAttribute("aria-selected",tab==="res");
   document.getElementById("tabAns").setAttribute("aria-selected",tab==="ans");
@@ -1611,6 +1680,7 @@ function renderState(){
 function renderTop(){
   var mine=(jget(MINE)||[]).slice().reverse();
   var h=renderNew();
+  h+='<p class="note" style="text-align:center"><a href="?admin">📋 幹事ダッシュボード（自分の募集を一覧で見る）</a></p>';
   if(mine.length&&!DEMO)h+='<details class="fold"><summary>この端末で作った募集（'+mine.length+'）</summary><div class="stars" style="flex-direction:column;align-items:stretch">'+
     mine.map(function(m){return '<a class="btn sub sm" style="text-align:left" href="'+esc(BASE+"?e="+m.id)+'">'+esc(m.title)+'　<small>〆'+md(m.deadline)+'</small></a>'}).join("")+
     '</div><p class="note">ほかの人には見えません。この端末のブラウザにだけ残っています。</p></details>';
@@ -1620,6 +1690,7 @@ function render(){
   renderBar();
   var ev=cur(),body;
   if(tab==="new"&&!READY){document.title="調整くんっ！🤠";body=renderState()}
+  else if(tab==="admin"){body=renderAdmin()}
   else if(tab==="new"){document.title="新しい募集｜調整くんっ！🤠";body=renderTop()}
   else if(!READY||!ev){document.title="調整くんっ！🤠";body=renderState()}
   else{document.title=pageTitle(ev);body=tab==="res"?renderRes():renderAns();if(tab==="res")checkPage(ev)}
@@ -1637,7 +1708,8 @@ document.addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
   var ds=b.dataset,ev=cur();
   if(b.id==="retry"){refresh();return}
-  if(!ev&&tab!=="new"&&!ds.ev)return;
+  if(ds.adm){admFilter=ds.adm;render();return}
+  if(!ev&&tab!=="new"&&tab!=="admin"&&!ds.ev)return;
   if(b.id==="tabRes"){tab="res";confirmDate=null;render();return}
   if(b.id==="tabAns"){tab="ans";if(!draft||draft.ev!==ev.id){var my=store(MYNAME);draft=null;if(my&&membersOf(ev).some(function(n){return norm(n)===norm(my)})){setName(my);return}}render();return}
   if(ds.ev){if(ds.ev==="__new"){tab="new"}else{S.cur=ds.ev;save();if(tab==="new")tab="res";draft=null}confirmDate=null;render();window.scrollTo({top:0});return}
@@ -1807,7 +1879,7 @@ document.addEventListener("pointerup",function(e){
 document.addEventListener("pointercancel",function(){nd.drag=null;calTouch=null});
 
 render();
-if(EID&&READY&&!DEMO)refresh();
+if((EID||ADMIN)&&READY&&!DEMO)refresh();
 if(tab==="new")loadBusy();
 loadExtra();setInterval(function(){if(!document.hidden)loadExtra()},120000);
 })();
