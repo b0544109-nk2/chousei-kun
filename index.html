@@ -1288,7 +1288,7 @@ function renderRes(){
     cms.map(function(n){return '<li><b>'+esc(n)+'</b><span>'+linkify(L[norm(n)].cm)+'</span></li>'}).join("")+'</ul></section>';
   var selRow=rows.filter(function(r){return r.d===selDate})[0];
   h+='<div class="cards">'+card(ev,selRow)+'</div>';
-  if(isOwner(ev.id))h+=orgMenu(ev);
+  if(isOwner(ev.id))h+=orgMenu(ev)+(DEMO?'':'<p class="note" style="text-align:center;margin:4px 0"><a href="?admin">📋 幹事ダッシュボード（ほかの募集もまとめて見る）</a></p>');
   h+='<section class="panel"><div class="legend">'+["o","ka","machi","kiken","x"].map(function(v){return '<div>'+symHtml(v)+SYM[v].label+'</div>'}).join("")+'</div></section>';
   return h;
 }
