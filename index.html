@@ -951,7 +951,7 @@ function renderExtra(){
       if(!!a.decided!==!!b.decided)return a.decided?1:-1;
       return a.decided?(a.decided<b.decided?1:-1):((a.deadline||"9")<(b.deadline||"9")?-1:1)});
     var open=list.filter(function(e){return !e.decided}).length;
-    h+='<details class="fold xbox"'+(tab==="new"?' open':'')+'><summary>📋 自分の募集（調整中 '+open+'・決定 '+(list.length-open)+'）<small>幹事の端末だけに表示</small></summary><ul class="xlist">'+
+    h+='<details class="fold xbox"'+(tab==="new"?' open':'')+'><summary>📋 自分の募集（調整中 '+open+'・決定 '+(list.length-open)+'）<small>幹事の端末だけに表示</small></summary><p class="note" style="margin:8px 0 0"><a href="?admin">📋 幹事ダッシュボードで状態を見る</a></p><ul class="xlist">'+
       list.map(function(e){return '<li'+(e.id===EID?' class="cur"':'')+'><a href="'+esc(BASE+"?e="+e.id)+'">'+esc(e.title)+'</a>'+evStatus(e)+
         (!e.decided&&e.holding&&e.holding.length?'<span class="xs hold">⏸ 調整中 '+e.holding.slice().sort().map(function(d){return esc(md(d)+"("+wd(d)+")")}).join("・")+'</span>':'')+
         '<span class="xs">回答 '+e.answers+(e.count?'/'+e.count:'')+'人</span>'+(mine[e.id]?'':'<span class="xs other">ほかの端末で作成</span>')+'</li>'}).join("")+'</ul></details>';
