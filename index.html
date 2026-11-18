@@ -968,7 +968,10 @@ function renderExtra(){
 /* ================= 幹事ダッシュボード（?admin） =================
    シートの募集と回答をぜんぶ読み、募集ごとに「決められる／要調整／結果待ち／厳しい／回答待ち」に分けて、
    手を付けるべき順に並べる。幹事の名前が自分の募集だけ（名前が未設定なら全部）。「すべて」で全員分も見られる */
-var admFilter=store(MYNAME)?"mine":"all", admLoaded=DEMO, admErr="";
+var admLoaded=DEMO, admErr="";
+/* 幹事の名前を入れた端末にだけ、その名前の募集を見せる（名前なしの昔の募集は、フリカレの鍵がある端末だけ） */
+function admMine(e){var my=store(MYNAME);return e.org?!!(my&&norm(e.org)===norm(my)):isBoss()}
+function admSetName(){var i=document.getElementById("admName"),v=i?i.value.trim():"";if(!v){toast("名前を入れてください");return}store(MYNAME,v);render()}
 function loadAdmin(){
   if(DEMO||!READY)return Promise.resolve();
   return Promise.all([gviz("募集"),gviz("回答")]).then(function(r){
@@ -1007,15 +1010,17 @@ function renderAdmin(){
   if(!admLoaded&&!admErr)return '<section class="panel"><p class="note" style="font-size:.9rem">読みこみ中…</p></section>';
   if(admErr&&!S.events.length)return '<section class="panel"><div class="sec-h" style="margin:0">読みこめませんでした</div>'+
     '<p class="note">電波のよいところで開き直してください。（'+esc(admErr)+'）</p><div><button class="btn sm" id="retry">もう一度読む</button></div></section>';
-  var my=store(MYNAME),mineOnly=admFilter==="mine";
-  var list=S.events.filter(function(e){return !mineOnly||isMyEvent(e)}).map(admInfo);
+  var my=String(store(MYNAME)||"").trim();
+  if(!my&&!DEMO)return '<section class="panel"><div class="sec-h" style="margin:0">📋 幹事ダッシュボード</div>'+
+    '<p class="note" style="font-size:.9rem">幹事として募集をつくったときの名前を入れると、その名前の募集が出ます。</p>'+
+    '<div class="stars"><input id="admName" type="text" maxlength="30" placeholder="幹事の名前" autocomplete="off" style="flex:1 1 10rem;min-width:0">'+
+    '<button class="btn sm" id="admSet">見る</button></div></section>';
+  var list=S.events.filter(function(e){return DEMO||admMine(e)}).map(admInfo);
   list.sort(function(a,b){return ADM[a.st].ord-ADM[b.st].ord||(a.st==="done"?((a.ev.decided<b.ev.decided)?1:-1):((a.ev.deadline||"9")<(b.ev.deadline||"9")?-1:1))});
   var open=list.filter(function(x){return x.st!=="done"}),done=list.filter(function(x){return x.st==="done"});
   var cnt={};open.forEach(function(x){cnt[x.st]=(cnt[x.st]||0)+1});
   var h='<section class="panel"><div class="sec-h" style="margin:0">📋 幹事ダッシュボード</div>'+
-    '<div class="stars" style="margin-top:8px"><button class="chipbtn" data-adm="mine" aria-pressed="'+mineOnly+'">自分の募集</button>'+
-    '<button class="chipbtn" data-adm="all" aria-pressed="'+!mineOnly+'">すべて</button></div>'+
-    (mineOnly&&!my?'<p class="note">名前が未設定の端末では、幹事の名前が入っていない募集だけ出ます。</p>':'')+
+    (my?'<p class="note" style="margin-top:6px">'+esc(my)+'さんの募集　<button class="chipbtn" id="admChange">名前を変える</button></p>':'')+
     '<p class="note">'+(open.length?'調整中 '+open.length+'件：'+["ok","ask","pend","hard","wait"].filter(function(k){return cnt[k]}).map(function(k){return ADM[k].name+' '+cnt[k]}).join('・'):'調整中の募集はありません')+'</p>';
   if(open.length)h+='<ul class="xlist adm-list">'+open.map(admRow).join("")+'</ul>';
   h+='</section>';
@@ -1708,7 +1713,8 @@ document.addEventListener("click",function(e){
   var b=e.target.closest("button");if(!b)return;
   var ds=b.dataset,ev=cur();
   if(b.id==="retry"){refresh();return}
-  if(ds.adm){admFilter=ds.adm;render();return}
+  if(b.id==="admSet"){admSetName();return}
+  if(b.id==="admChange"){store(MYNAME,"");render();return}
   if(!ev&&tab!=="new"&&tab!=="admin"&&!ds.ev)return;
   if(b.id==="tabRes"){tab="res";confirmDate=null;render();return}
   if(b.id==="tabAns"){tab="ans";if(!draft||draft.ev!==ev.id){var my=store(MYNAME);draft=null;if(my&&membersOf(ev).some(function(n){return norm(n)===norm(my)})){setName(my);return}}render();return}
@@ -1871,6 +1877,7 @@ document.addEventListener("pointermove",function(e){
   if(!b||b.disabled)return;
   calSet(b,nd.drag);refreshPicked();
 });
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="admName"){e.preventDefault();admSetName()}});
 document.addEventListener("pointerup",function(e){
   if(calTouch&&nd.drag==null){var b=calTouch.b,calTouch0=calTouch;calTouch=null;
     if(b.isConnected&&Math.abs(e.clientX-calTouch0.x)<=10&&Math.abs(e.clientY-calTouch0.y)<=10){calSet(b,!nd.dates[b.dataset.day]);refreshPicked()}}
